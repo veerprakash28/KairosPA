@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChronosPA - Personal Assistant & Reminder Dashboard</title>
+  <!-- Google Fonts for Sleek Tech Aesthetics -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Sidebar: Personal Assistant "Chronos" Panel -->
+    <aside class="sidebar" id="pa-sidebar">
+      <div class="pa-header">
+        <div class="avatar-container">
+          <div class="avatar-ring ring-outer"></div>
+          <div class="avatar-ring ring-middle"></div>
+          <div class="avatar-ring ring-inner"></div>
+          <div class="avatar-glow"></div>
+          <div class="avatar-icon">
+            <svg viewBox="0 0 100 100" width="48" height="48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M50 15V25M50 75V85M15 50H25M75 50H85M25 25L32 32M68 68L75 75M75 25L68 32M32 68L25 75" stroke="#7000ff" stroke-width="6" stroke-linecap="round"/>
+              <circle cx="50" cy="50" r="18" stroke="#00f3ff" stroke-width="6"/>
+              <path d="M50 38V50L58 54" stroke="#00f3ff" stroke-width="6" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="pa-info">
+          <h2>Chronos</h2>
+          <span class="pa-status-badge"><span class="status-dot pulsing"></span>Online Assistant</span>
+        </div>
+      </div>
+
+      <!-- PA Dialogue Log -->
+      <div class="pa-chat-log" id="pa-chat-log">
+        <div class="chat-message assistant-message">
+          <div class="message-content">
+            Hello, I am Chronos, your Personal Assistant. How can I help you today? You can add tasks manually on the right or type commands directly to me below!
+          </div>
+          <div class="message-meta">Just now</div>
+        </div>
+        <div class="chat-message assistant-message">
+          <div class="message-content">
+            Try typing: <code>remind me to stretch in 10 mins</code> or <code>add task report at 15:30</code>.
+          </div>
+          <div class="message-meta">Just now</div>
+        </div>
+      </div>
+
+      <!-- Input Command Line -->
+      <form class="pa-input-container" id="pa-command-form" autocomplete="off">
+        <input type="text" id="pa-command-input" placeholder="Type a task command..." required>
+        <button type="submit" id="pa-send-btn" class="glow-button-primary">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+    </aside>
+
+    <!-- Main Board Area -->
+    <main class="main-content">
+      <!-- Top header bar -->
+      <header class="dashboard-header">
+        <div class="header-welcome">
+          <h1 id="greeting-text">Hello, User</h1>
+          <p id="sub-greeting">Let's coordinate your schedule for today.</p>
+        </div>
+        <div class="header-status-panel">
+          <div class="live-clock" id="live-clock">
+            <div class="clock-time" id="clock-time">00:00:00</div>
+            <div class="clock-date" id="clock-date">Sunday, June 21, 2026</div>
+          </div>
+          <button id="notification-toggle-btn" class="status-btn permission-denied">
+            <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            <span id="notification-btn-text">Enable Desktop Notifications</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Dashboard Metrics -->
+      <section class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon bg-pending">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Pending Today</span>
+            <span class="metric-value" id="stats-pending">0</span>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon bg-completed">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Completed</span>
+            <span class="metric-value" id="stats-completed">0</span>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon bg-carried">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Carried Forward</span>
+            <span class="metric-value" id="stats-carried">0</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Main Columns Grid -->
+      <section class="dashboard-columns">
+        <!-- Task Management Column -->
+        <article class="board-column tasks-column">
+          <div class="column-header">
+            <h3>Today's Focus & Schedule</h3>
+            <button id="add-task-modal-btn" class="action-icon-btn" title="Add New Task">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="task-timeline" id="task-timeline">
+            <!-- Timeline elements populated by JS -->
+          </div>
+        </article>
+
+        <!-- Calendar and Overdue Column -->
+        <article class="board-column calendar-column">
+          <!-- Overdue Carry Forward banner -->
+          <div class="carry-forward-banner hidden" id="carry-forward-banner">
+            <div class="banner-content">
+              <svg class="warning-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <div>
+                <strong id="carry-forward-message">You have 3 tasks from yesterday!</strong>
+                <p>Would you like to reschedule them to today?</p>
+              </div>
+            </div>
+            <button id="carry-all-forward-btn" class="glass-button-accent">Reschedule All</button>
+          </div>
+
+          <!-- Calendar Widget -->
+          <div class="calendar-widget">
+            <div class="calendar-header">
+              <button id="cal-prev-btn" class="cal-nav-btn">&larr;</button>
+              <h4 id="cal-month-year">June 2026</h4>
+              <button id="cal-next-btn" class="cal-nav-btn">&rarr;</button>
+            </div>
+            <div class="calendar-days-label">
+              <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+            </div>
+            <div class="calendar-grid" id="calendar-grid">
+              <!-- Calendar grid populated by JS -->
+            </div>
+          </div>
+
+          <!-- Selected Day Tasks Preview -->
+          <div class="day-preview-container">
+            <div class="preview-header">
+              <h4 id="preview-date-title">Tasks for June 21, 2026</h4>
+            </div>
+            <div class="day-preview-list" id="day-preview-list">
+              <p class="empty-state-text">Select a date in the calendar to view scheduled items.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <!-- IN-APP POPUP REMINDER MODAL (ALERT OVERLAY) -->
+    <div class="alert-overlay hidden" id="alert-overlay">
+      <div class="alert-modal glass-card">
+        <div class="alert-header">
+          <div class="alert-bell-container">
+            <svg class="pulsing-bell" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#00f3ff" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+          </div>
+          <h3>Notification Alert</h3>
+        </div>
+        <div class="alert-body">
+          <p class="alert-instruction">Time to complete your task:</p>
+          <h2 id="alert-task-title">Drink Water</h2>
+          <div class="alert-details">
+            <span class="alert-time-badge" id="alert-task-time">02:30 PM</span>
+            <span class="alert-priority-badge" id="alert-task-priority">HIGH PRIORITY</span>
+          </div>
+        </div>
+        <div class="alert-footer">
+          <button id="alert-complete-btn" class="glow-button-primary">Complete Task</button>
+          <button id="alert-postpone-btn" class="glass-button-secondary">Postpone 15 mins</button>
+          <button id="alert-carry-btn" class="glass-button-secondary">Carry to Tomorrow</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK ADD TASK MODAL (MANUAL INPUT) -->
+    <div class="modal-overlay hidden" id="task-modal-overlay">
+      <div class="modal-card glass-card">
+        <div class="modal-header">
+          <h3>Create Task Reminder</h3>
+          <button id="task-modal-close" class="close-btn">&times;</button>
+        </div>
+        <form id="task-modal-form">
+          <div class="form-group">
+            <label for="task-title">Task Description</label>
+            <input type="text" id="task-title" placeholder="e.g. Call Client, Drink Water, Stand Up" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="task-date">Date</label>
+              <input type="date" id="task-date" required>
+            </div>
+            <div class="form-group">
+              <label for="task-time">Time</label>
+              <input type="time" id="task-time" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="task-priority">Priority</label>
+              <select id="task-priority">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="task-repeat">Repeat</label>
+              <select id="task-repeat">
+                <option value="none" selected>None</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-footer">
+            <button type="button" id="task-modal-cancel" class="glass-button-secondary">Cancel</button>
+            <button type="submit" class="glow-button-primary">Schedule Task</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- RESCHEDULE TASK MODAL -->
+    <div class="modal-overlay hidden" id="reschedule-modal-overlay">
+      <div class="modal-card glass-card">
+        <div class="modal-header">
+          <h3>Reschedule Task</h3>
+          <button id="reschedule-modal-close" class="close-btn">&times;</button>
+        </div>
+        <form id="reschedule-modal-form">
+          <input type="hidden" id="reschedule-task-id">
+          <div class="form-group">
+            <label>Task Description</label>
+            <div id="reschedule-task-title-text" style="font-weight: 500; color: #fff; padding: 10px; background: rgba(0,0,0,0.15); border-radius: var(--border-radius-sm); border: 1px solid rgba(255,255,255,0.04);"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reschedule-date">Date</label>
+              <input type="date" id="reschedule-date" required>
+            </div>
+            <div class="form-group">
+              <label for="reschedule-time">Time</label>
+              <input type="time" id="reschedule-time" required>
+            </div>
+          </div>
+          <div class="form-footer">
+            <button type="button" id="reschedule-modal-cancel" class="glass-button-secondary">Cancel</button>
+            <button type="submit" class="glow-button-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Audio Element (Will fallback to Synth Web Audio API if browser blocks loading, but is standard helper) -->
+  <audio id="chime-sound" preload="auto">
+    <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAAA" type="audio/wav">
+  </audio>
+
+  <script src="app.js"></script>
+</body>
+</html>
