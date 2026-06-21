@@ -2048,6 +2048,11 @@ body.sidebar-collapsed .desktop-sidebar-toggle-btn {
     align-items: flex-start;
   }
 
+  .profile-dropdown {
+    right: auto;
+    left: 0;
+  }
+
   .form-row {
     grid-template-columns: 1fr;
     gap: 0;
