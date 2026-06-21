@@ -8,6 +8,7 @@ let db = null;
 let auth = null;
 let fcmMessaging = null;  // Firebase Cloud Messaging for push notifications
 let userTasksUnsubscribe = null;
+let userChatUnsubscribe = null;
 let currentUser = null;
 let firebaseActive = false;
 
@@ -304,6 +305,7 @@ function initFirebaseAuth() {
 
         // Start Firestore real-time sync
         syncTasksFromFirestore(user.uid);
+        syncChatFromFirestore(user.uid);
 
         // Register FCM push token for this device
         initFcmMessaging(user.uid);
@@ -329,6 +331,10 @@ function initFirebaseAuth() {
         if (userTasksUnsubscribe) {
           userTasksUnsubscribe();
           userTasksUnsubscribe = null;
+        }
+        if (userChatUnsubscribe) {
+          userChatUnsubscribe();
+          userChatUnsubscribe = null;
         }
 
         // Render local state
@@ -378,6 +384,47 @@ function syncTasksFromFirestore(uid) {
     }, err => {
       console.error("Firestore sync error:", err);
     });
+}
+
+// --- Firestore Real-Time Chat logs Sync ---
+function syncChatFromFirestore(uid) {
+  if (userChatUnsubscribe) {
+    userChatUnsubscribe();
+  }
+
+  userChatUnsubscribe = db.collection("users").doc(uid).collection("chatHistory")
+    .orderBy("timestamp", "asc")
+    .onSnapshot(snapshot => {
+      let history = [];
+      snapshot.forEach(doc => {
+        history.push(doc.data());
+      });
+      AppState.chatHistory = history;
+      renderChatHistory();
+    }, err => {
+      console.error("Firestore chat sync error:", err);
+    });
+}
+
+function drawMessageInLog(msg) {
+  const log = document.getElementById("pa-chat-log");
+  if (!log) return;
+  const msgEl = document.createElement("div");
+  if (msg.sender === "assistant") {
+    msgEl.className = `chat-message assistant-message ${msg.className || ""}`;
+    msgEl.innerHTML = `
+      <div class="message-content">${formatMarkdown(msg.text)}</div>
+      <div class="message-meta">${msg.time || "Just now"}</div>
+    `;
+  } else {
+    msgEl.className = "chat-message user-message";
+    msgEl.innerHTML = `
+      <div class="message-content">${msg.text}</div>
+      <div class="message-meta">${msg.time || "Just now"}</div>
+    `;
+  }
+  log.appendChild(msgEl);
+  log.scrollTop = log.scrollHeight;
 }
 
 // --- FCM Push Notification Token Registration ---
@@ -1371,68 +1418,47 @@ function renderChatHistory() {
   if (!log) return;
   log.innerHTML = "";
 
-  if (!AppState.chatHistory || AppState.chatHistory.length === 0) {
-    AppState.chatHistory = [
+  const history = AppState.chatHistory || [];
+  if (history.length === 0) {
+    const defaultGreetings = [
       { sender: "assistant", text: "Hello! I'm Chronos, your Personal Assistant. You can add tasks manually or type commands to me below!" },
       { sender: "assistant", text: "Try typing: `water flowers at 15:00, meeting at 16:00` to schedule multiple tasks at once." }
     ];
+    defaultGreetings.forEach(msg => drawMessageInLog(msg));
+  } else {
+    history.forEach(msg => drawMessageInLog(msg));
   }
-
-  AppState.chatHistory.forEach(msg => {
-    const msgEl = document.createElement("div");
-    if (msg.sender === "assistant") {
-      msgEl.className = `chat-message assistant-message ${msg.className || ""}`;
-      msgEl.innerHTML = `
-        <div class="message-content">${formatMarkdown(msg.text)}</div>
-        <div class="message-meta">${msg.time || "Just now"}</div>
-      `;
-    } else {
-      msgEl.className = "chat-message user-message";
-      msgEl.innerHTML = `
-        <div class="message-content">${msg.text}</div>
-        <div class="message-meta">${msg.time || "Just now"}</div>
-      `;
-    }
-    log.appendChild(msgEl);
-  });
-  log.scrollTop = log.scrollHeight;
 }
 
 function addAssistantMessage(text, className = "") {
-  if (!AppState.chatHistory) AppState.chatHistory = [];
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  AppState.chatHistory.push({ sender: "assistant", text: text, className: className, time: timeStr });
-  saveState();
+  const msgId = "msg-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
+  const msgObj = { id: msgId, sender: "assistant", text: text, className: className, time: timeStr, timestamp: Date.now() };
 
-  const log = document.getElementById("pa-chat-log");
-  if (log) {
-    const msg = document.createElement("div");
-    msg.className = `chat-message assistant-message ${className}`;
-    msg.innerHTML = `
-      <div class="message-content">${formatMarkdown(text)}</div>
-      <div class="message-meta">${timeStr}</div>
-    `;
-    log.appendChild(msg);
-    log.scrollTop = log.scrollHeight;
+  if (db && currentUser) {
+    db.collection("users").doc(currentUser.uid).collection("chatHistory").doc(msgId).set(msgObj)
+      .catch(err => console.error("Save assistant message failed:", err));
+  } else {
+    if (!AppState.chatHistory) AppState.chatHistory = [];
+    AppState.chatHistory.push(msgObj);
+    saveState();
+    drawMessageInLog(msgObj);
   }
 }
 
 function addUserMessage(text) {
-  if (!AppState.chatHistory) AppState.chatHistory = [];
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  AppState.chatHistory.push({ sender: "user", text: text, time: timeStr });
-  saveState();
+  const msgId = "msg-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
+  const msgObj = { id: msgId, sender: "user", text: text, time: timeStr, timestamp: Date.now() };
 
-  const log = document.getElementById("pa-chat-log");
-  if (log) {
-    const msg = document.createElement("div");
-    msg.className = "chat-message user-message";
-    msg.innerHTML = `
-      <div class="message-content">${text}</div>
-      <div class="message-meta">${timeStr}</div>
-    `;
-    log.appendChild(msg);
-    log.scrollTop = log.scrollHeight;
+  if (db && currentUser) {
+    db.collection("users").doc(currentUser.uid).collection("chatHistory").doc(msgId).set(msgObj)
+      .catch(err => console.error("Save user message failed:", err));
+  } else {
+    if (!AppState.chatHistory) AppState.chatHistory = [];
+    AppState.chatHistory.push(msgObj);
+    saveState();
+    drawMessageInLog(msgObj);
   }
 }
 
@@ -1772,10 +1798,25 @@ function initEventListeners() {
   const clearChatBtn = document.getElementById("clear-chat-btn");
   if (clearChatBtn) {
     clearChatBtn.addEventListener("click", () => {
-      AppState.chatHistory = [];
-      saveState();
-      renderChatHistory();
-      addAssistantMessage("🧹 Chat logs cleared.");
+      if (db && currentUser) {
+        db.collection("users").doc(currentUser.uid).collection("chatHistory").get()
+          .then(snapshot => {
+            const batch = db.batch();
+            snapshot.forEach(doc => {
+              batch.delete(doc.ref);
+            });
+            return batch.commit();
+          })
+          .then(() => {
+            addAssistantMessage("🧹 Chat logs cleared.");
+          })
+          .catch(err => console.error("Clear online chat history failed:", err));
+      } else {
+        AppState.chatHistory = [];
+        saveState();
+        renderChatHistory();
+        addAssistantMessage("🧹 Chat logs cleared.");
+      }
     });
   }
 
