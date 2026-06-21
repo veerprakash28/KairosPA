@@ -103,6 +103,7 @@ body {
   padding: 24px;
   padding-bottom: max(24px, env(safe-area-inset-bottom)); /* iOS notch */
   box-shadow: 10px 0 30px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 /* Close button (visible only on mobile) */
@@ -384,6 +385,7 @@ body {
   flex-grow: 1;
   padding: 36px 40px;
   min-height: 100vh;
+  transition: margin-left 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 /* Top Dashboard Header */
@@ -420,6 +422,28 @@ body {
 .mobile-menu-btn:hover {
   background: rgba(0, 243, 255, 0.08);
   border-color: rgba(0, 243, 255, 0.25);
+}
+
+.desktop-sidebar-toggle-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-smooth);
+  flex-shrink: 0;
+  margin-right: 12px;
+}
+
+.desktop-sidebar-toggle-btn:hover {
+  background: rgba(0, 243, 255, 0.08);
+  border-color: rgba(0, 243, 255, 0.25);
+  color: var(--accent-cyan);
 }
 
 /* Floating chat button for mobile */
@@ -529,8 +553,8 @@ body {
 /* Metrics Row Grid */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
   margin-bottom: 36px;
 }
 
@@ -600,7 +624,7 @@ body {
 /* Dashboard Content Split Layout */
 .dashboard-columns {
   display: grid;
-  grid-template-columns: 1.1fr 1.1fr 0.95fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
 }
 
@@ -1084,11 +1108,18 @@ body {
   padding-top: 16px;
 }
 
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 .preview-header h4 {
   font-size: 0.9rem;
   color: #94a3b8;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .day-preview-list {
@@ -1097,6 +1128,11 @@ body {
   gap: 10px;
   max-height: 200px;
   overflow-y: auto;
+}
+
+.day-preview-list.task-timeline {
+  min-height: auto;
+  max-height: 320px;
 }
 
 .preview-item {
@@ -1799,6 +1835,9 @@ body {
   .mobile-menu-btn {
     display: flex;
   }
+  .desktop-sidebar-toggle-btn {
+    display: none;
+  }
   .mobile-chat-fab {
     display: flex;
   }
@@ -2122,5 +2161,15 @@ body.sidebar-open {
   gap: 8px;
   margin-top: 8px;
   flex-wrap: wrap;
+}
+
+@media (min-width: 769px) {
+  body.sidebar-collapsed .sidebar {
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+  body.sidebar-collapsed .main-content {
+    margin-left: 0;
+  }
 }
 

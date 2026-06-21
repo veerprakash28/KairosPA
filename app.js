@@ -92,6 +92,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Always load the local state (tasks, preferences, chat logs) on startup first
   loadState();
 
+  if (AppState.preferences && AppState.preferences.sidebarCollapsed) {
+    document.body.classList.add("sidebar-collapsed");
+  }
+
   initClock();
   initCalendar();
   initEventListeners();
@@ -1272,21 +1276,11 @@ function renderSelectedDayPreview() {
   filtered.sort((a, b) => a.time.localeCompare(b.time));
   container.innerHTML = "";
 
-  filtered.forEach(task => {
-    const item = document.createElement("div");
-    item.className = "preview-item";
-    const [h, m] = task.time.split(":");
-    const ampm = h >= 12 ? "PM" : "AM";
-    const displayTime = `${h % 12 || 12}:${m} ${ampm}`;
+  const now = new Date();
+  const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    item.innerHTML = `
-      <div class="preview-item-left">
-        <span class="preview-item-time">${displayTime}</span>
-        <span class="preview-item-title ${task.status === 'completed' ? 'completed' : ''}">${task.title}</span>
-      </div>
-      <span class="priority-badge prio-${task.priority}-badge">${task.priority}</span>
-    `;
-    container.appendChild(item);
+  filtered.forEach(task => {
+    renderTaskCard(container, task, currentTimeStr);
   });
 }
 
@@ -1604,7 +1598,7 @@ function parseCommand(cmd) {
 
   // Detect routing prefix and strip it
   let isManualSource = false;
-  const manualPrefixRegex = /^\b(?:add\s+tasks|add\s+task|add\s+todos|add\s+todo|add|todos|todo|schedule\s+tasks|schedule\s+task|schedule)\b\s*:?\s*/i;
+  const manualPrefixRegex = /^\b(?:add\s+tasks|add\s+task|add\s+todos|add\s+todo|add|todos|todo|tasks|task|schedule\s+tasks|schedule\s+task|schedule)\b\s*:?\s*/i;
   
   if (manualPrefixRegex.test(text)) {
     isManualSource = true;
@@ -1860,6 +1854,18 @@ function initEventListeners() {
     previewAddBtn.addEventListener("click", () => {
       AppState.modalSource = "manual";
       openAddTaskModal();
+    });
+  }
+
+  const desktopSidebarToggle = document.getElementById("desktop-sidebar-toggle-btn");
+  if (desktopSidebarToggle) {
+    desktopSidebarToggle.addEventListener("click", () => {
+      document.body.classList.toggle("sidebar-collapsed");
+      if (!AppState.preferences) {
+        AppState.preferences = {};
+      }
+      AppState.preferences.sidebarCollapsed = document.body.classList.contains("sidebar-collapsed");
+      saveState();
     });
   }
 
