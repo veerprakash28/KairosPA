@@ -1,0 +1,19 @@
+# Local Configuration (never commit Firebase keys)
+config.json
+config.js
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Firebase CLI
+.firebaserc
+
+# Cloud Functions dependencies
+functions/node_modules/
+
+# Firebase local emulator data
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
