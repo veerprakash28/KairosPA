@@ -1,6 +1,6 @@
 # Enabling Push Notifications — Developer Setup Guide
 
-This guide walks you through setting up Firebase Cloud Messaging (FCM) so that ChronosPA can send push notifications to users **even when their browser is closed**.
+This guide walks you through setting up Firebase Cloud Messaging (FCM) so that KairosPA can send push notifications to users **even when their browser is closed**.
 
 ---
 
@@ -133,12 +133,12 @@ If you haven't already, create a `firebase.json` in the project root:
 
 ## How It Works (User Perspective)
 
-1. User signs in to ChronosPA on their phone or laptop
+1. User signs in to KairosPA on their phone or laptop
 2. They allow browser notifications when prompted
 3. Their device is registered for push notifications (silently in the background)
 4. When a task is due, the Firebase Cloud Function (running in the cloud) sends a push notification to all the user's signed-in devices
 5. The notification appears even if the browser is closed or the device is locked
-6. When they open ChronosPA, the task is already shown as notified
+6. When they open KairosPA, the task is already shown as notified
 
 ---
 

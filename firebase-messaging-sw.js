@@ -1,5 +1,5 @@
 // ==========================================================================
-// ChronosPA - Firebase Cloud Messaging Dynamic Service Worker
+// KairosPA - Firebase Cloud Messaging Dynamic Service Worker
 // ==========================================================================
 
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
@@ -20,11 +20,11 @@ self.addEventListener('message', (event) => {
         // Background notifications listener
         messaging.onBackgroundMessage((payload) => {
           console.log('[firebase-messaging-sw.js] Received background message ', payload);
-          const title = payload.notification?.title || "ChronosPA Alarm";
+          const title = payload.notification?.title || "KairosPA Alarm";
           const options = {
             body: payload.notification?.body || "Time to complete your scheduled task!",
             icon: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="%2300f3ff"><circle cx="50" cy="50" r="40" stroke="black" stroke-width="4"/></svg>',
-            tag: 'chronos-task-alert',
+            tag: 'kairos-task-alert',
             renotify: true
           };
 

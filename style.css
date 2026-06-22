@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ChronosPA CSS - Core Design System & Glassmorphism Theme
+   KairosPA CSS - Core Design System & Glassmorphism Theme
    ========================================================================== */
 
 /* Design Tokens & Theme Variables */
@@ -83,7 +83,7 @@ body {
 }
 
 /* ==========================================================================
-   SIDEBAR COMPONENT: Personal Assistant "Chronos"
+   SIDEBAR COMPONENT: Personal Assistant "Kairos"
    ========================================================================== */
 .sidebar {
   width: var(--sidebar-width);

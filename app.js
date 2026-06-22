@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ChronosPA Javascript - Application Logic, Firebase Sync, Notifications
+   KairosPA Javascript - Application Logic, Firebase Sync, Notifications
    ========================================================================== */
 
 // --- Firebase Configuration Variables ---
@@ -123,12 +123,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 // --- LocalStorage Persistence (fallback when no Firebase) ---
 function saveState() {
   if (!firebaseActive || !currentUser) {
-    localStorage.setItem("ChronosPA_State", JSON.stringify(AppState));
+    localStorage.setItem("KairosPA_State", JSON.stringify(AppState));
   }
 }
 
 function loadState() {
-  const saved = localStorage.getItem("ChronosPA_State");
+  const saved = localStorage.getItem("KairosPA_State") || localStorage.getItem("ChronosPA_State");
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -271,7 +271,7 @@ function initFirebaseAuth() {
         document.getElementById("signup-name").value = "";
         document.getElementById("signup-email").value = "";
         document.getElementById("signup-password").value = "";
-        addAssistantMessage(`👋 Welcome to ChronosPA, **${name}**! Your account is ready.`);
+        addAssistantMessage(`👋 Welcome to KairosPA, **${name}**! Your account is ready.`);
       })
       .catch(err => {
         errorEl.textContent = friendlyAuthError(err.code);
@@ -493,7 +493,7 @@ async function initFcmMessaging(uid) {
 
     // Listen for foreground push messages and show them as assistant messages
     fcmMessaging.onMessage(payload => {
-      const title = payload.notification?.title || "ChronosPA";
+      const title = payload.notification?.title || "KairosPA";
       const body = payload.notification?.body || "You have a task due!";
       addAssistantMessage(`🔔 **${title}**: ${body}`, "alert-msg");
     });
@@ -1449,7 +1449,7 @@ function renderChatHistory() {
   const history = AppState.chatHistory || [];
   if (history.length === 0) {
     const defaultGreetings = [
-      { sender: "assistant", text: "Hello! I'm Chronos, your Personal Assistant. You can add tasks manually or type commands to me below!" },
+      { sender: "assistant", text: "Hello! I'm Kairos, your Personal Assistant. You can add tasks manually or type commands to me below!" },
       { sender: "assistant", text: "Try typing: `water flowers at 15:00, meeting at 16:00` to schedule multiple tasks at once." }
     ];
     defaultGreetings.forEach(msg => drawMessageInLog(msg));

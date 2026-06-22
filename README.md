@@ -1,4 +1,4 @@
-# ChronosPA — Personal Assistant & Task Dashboard
+# KairosPA — Personal Assistant & Task Dashboard
 
 A premium glassmorphic personal assistant web app for managing tasks, schedules, and reminders across all your devices.
 
@@ -14,7 +14,7 @@ A premium glassmorphic personal assistant web app for managing tasks, schedules,
 
 ## Live Demo
 
-Visit the deployed app: [ChronosPA on GitHub Pages](https://veerprakash28.github.io/ChronosPA/)
+Visit the deployed app: [KairosPA on GitHub Pages](https://veerprakash28.github.io/KairosPA/)
 
 ## Running Locally
 

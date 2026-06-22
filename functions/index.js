@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ChronosPA — Firebase Cloud Functions
+   KairosPA — Firebase Cloud Functions
    Scheduled background worker that sends push notifications to all user
    devices when a task's due time arrives, even if the browser is closed.
    ========================================================================== */
@@ -104,7 +104,7 @@ exports.checkScheduledTasks = functions.pubsub
         try {
           await sendFCMNotification(
             uid,
-            "⏰ ChronosPA Reminder",
+            "⏰ KairosPA Reminder",
             task.title || "You have a task due!",
             taskDoc.id
           );

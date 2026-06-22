@@ -1,6 +1,6 @@
 {
-  "name": "chronospa-functions",
-  "description": "Firebase Cloud Functions for ChronosPA — scheduled push notifications",
+  "name": "kairospa-functions",
+  "description": "Firebase Cloud Functions for KairosPA — scheduled push notifications",
   "scripts": {
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
