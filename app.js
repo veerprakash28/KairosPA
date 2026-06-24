@@ -9,6 +9,7 @@ let auth = null;
 let fcmMessaging = null;  // Firebase Cloud Messaging for push notifications
 let userTasksUnsubscribe = null;
 let userChatUnsubscribe = null;
+let userProfileUnsubscribe = null;
 let currentUser = null;
 let firebaseActive = false;
 
@@ -59,7 +60,8 @@ let AppState = {
     username: "User",
     soundEnabled: true,
     notificationPermission: null,
-    notificationsMuted: false
+    notificationsMuted: false,
+    aiName: "Kairos"
   },
   currentCalendarMonth: new Date().getMonth(),
   currentCalendarYear: new Date().getFullYear(),
@@ -92,6 +94,7 @@ const priorityLabels = {
 document.addEventListener("DOMContentLoaded", async () => {
   // Always load the local state (tasks, preferences, chat logs) on startup first
   loadState();
+  updateAssistantNameUI();
 
   if (AppState.preferences && AppState.preferences.sidebarCollapsed) {
     document.body.classList.add("sidebar-collapsed");
@@ -183,6 +186,7 @@ function initFirebaseAuth() {
           console.warn("FCM token removal skipped:", e.message);
         }
       }
+      logUserActivity("logout");
       await auth.signOut();
       addAssistantMessage("👋 You have signed out. See you next time!");
     } catch (err) {
@@ -204,6 +208,7 @@ function initFirebaseAuth() {
         const user = result.user;
         const displayName = user.displayName || user.email.split("@")[0];
         addAssistantMessage(`🎉 Welcome, **${displayName}**! Signed in with Google.`);
+        logUserActivity("login", { method: "google" });
       })
       .catch((err) => {
         if (err.code !== "auth/popup-closed-by-user" && err.code !== "auth/cancelled-popup-request") {
@@ -234,6 +239,7 @@ function initFirebaseAuth() {
 
     auth.signInWithEmailAndPassword(email, password)
       .then(() => {
+        logUserActivity("login", { method: "email" });
         document.getElementById("login-email").value = "";
         document.getElementById("login-password").value = "";
       })
@@ -267,6 +273,7 @@ function initFirebaseAuth() {
       .then(() => {
         // Save user profile details to Firestore
         saveUserProfile(auth.currentUser);
+        logUserActivity("signup", { method: "email" });
 
         document.getElementById("signup-name").value = "";
         document.getElementById("signup-email").value = "";
@@ -312,10 +319,18 @@ function initFirebaseAuth() {
         // Start Firestore real-time sync
         syncTasksFromFirestore(user.uid);
         syncChatFromFirestore(user.uid);
+        syncProfileFromFirestore(user.uid);
 
         // Register FCM push token for this device
         initFcmMessaging(user.uid);
 
+        // Toggle custom settings dropdown display
+        const settingsSection = document.getElementById("dropdown-settings-section");
+        const settingsDivider = document.getElementById("settings-divider");
+        if (settingsSection) settingsSection.classList.remove("hidden");
+        if (settingsDivider) settingsDivider.classList.remove("hidden");
+
+        logUserActivity("session_restore", { userAgent: navigator.userAgent });
         addAssistantMessage(`🔒 Synced! Welcome back, **${displayName}**.`);
       } else {
         currentUser = null;
@@ -333,6 +348,12 @@ function initFirebaseAuth() {
         if (signInBtn) signInBtn.classList.remove("hidden");
         if (signOutBtn) signOutBtn.classList.add("hidden");
 
+        // Hide custom settings dropdown display
+        const settingsSection = document.getElementById("dropdown-settings-section");
+        const settingsDivider = document.getElementById("settings-divider");
+        if (settingsSection) settingsSection.classList.add("hidden");
+        if (settingsDivider) settingsDivider.classList.add("hidden");
+
         // Unsubscribe from Firestore
         if (userTasksUnsubscribe) {
           userTasksUnsubscribe();
@@ -341,6 +362,10 @@ function initFirebaseAuth() {
         if (userChatUnsubscribe) {
           userChatUnsubscribe();
           userChatUnsubscribe = null;
+        }
+        if (userProfileUnsubscribe) {
+          userProfileUnsubscribe();
+          userProfileUnsubscribe = null;
         }
 
         // Render local state
@@ -389,6 +414,17 @@ function saveUserProfile(user) {
     });
 }
 
+// --- Log User Activity to Firestore ---
+function logUserActivity(actionType, actionDetails = {}) {
+  if (!firebaseActive || !db || !currentUser) return;
+  db.collection("users").doc(currentUser.uid).collection("activity_logs").add({
+    actionType,
+    details: actionDetails,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    userAgent: navigator.userAgent
+  }).catch(err => console.error("Error logging user activity:", err));
+}
+
 // --- Firestore Real-Time Sync ---
 function syncTasksFromFirestore(uid) {
   if (userTasksUnsubscribe) {
@@ -399,7 +435,10 @@ function syncTasksFromFirestore(uid) {
     .onSnapshot(snapshot => {
       let tasksList = [];
       snapshot.forEach(doc => {
-        tasksList.push(doc.data());
+        const data = doc.data();
+        if (!data.deleted) {
+          tasksList.push(data);
+        }
       });
       AppState.tasks = tasksList;
 
@@ -518,6 +557,7 @@ function getTaskTimestamp(dateStr, timeStr) {
 // --- Firestore helper: save a single task ---
 function firestoreSaveTask(task) {
   if (db && currentUser) {
+    logUserActivity("create_task", { taskId: task.id, title: task.title, date: task.date, time: task.time });
     return db.collection("users").doc(currentUser.uid).collection("tasks").doc(task.id).set(task);
   }
   return Promise.resolve();
@@ -525,6 +565,11 @@ function firestoreSaveTask(task) {
 
 function firestoreUpdateTask(taskId, updates) {
   if (db && currentUser) {
+    if (updates.status) {
+      logUserActivity(updates.status === "completed" ? "complete_task" : "incomplete_task", { taskId: taskId });
+    } else {
+      logUserActivity("update_task", { taskId: taskId, updates: updates });
+    }
     // If date or time is being updated, recompute dueTimestamp
     const task = AppState.tasks.find(t => t.id === taskId);
     if (task && (updates.date || updates.time)) {
@@ -539,7 +584,11 @@ function firestoreUpdateTask(taskId, updates) {
 
 function firestoreDeleteTask(taskId) {
   if (db && currentUser) {
-    return db.collection("users").doc(currentUser.uid).collection("tasks").doc(taskId).delete();
+    logUserActivity("delete_task", { taskId: taskId });
+    return db.collection("users").doc(currentUser.uid).collection("tasks").doc(taskId).update({
+      deleted: true,
+      deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
   }
   return Promise.resolve();
 }
@@ -566,6 +615,30 @@ function initClock() {
 
     greetingText.textContent = `${greeting}, ${AppState.preferences.username}`;
     checkSchedulerAlerts(now);
+
+    // Nag/loop alert warning every 5 minutes if there is an active unanswered alert
+    if (AppState.activeAlertTask) {
+      const elapsed = Date.now() - (AppState.lastAlertRepeatTime || Date.now());
+      if (elapsed >= 5 * 60 * 1000) {
+        AppState.lastAlertRepeatTime = Date.now();
+        playNotificationChime();
+        
+        const title = AppState.activeAlertTask.title;
+        const body = AppState.activeAlertIsLeading ? `Upcoming event on ${AppState.activeAlertTask.date} at ${AppState.activeAlertTask.time}` : `Scheduled for today at ${AppState.activeAlertTask.time}`;
+        
+        if (Notification.permission === "granted") {
+          try {
+            new Notification(`⏰ REMINDER: ${title}`, {
+              body: body,
+              icon: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="%2300f3ff"><circle cx="50" cy="50" r="40" stroke="black" stroke-width="4"/></svg>'
+            });
+          } catch (e) {
+            console.warn("Failed to pop desktop notification:", e);
+          }
+        }
+        addAssistantMessage(`⏰ REMINDER: Still pending: "**${title}**". Please take action.`, "alert-msg");
+      }
+    }
   }
 
   tick();
@@ -791,6 +864,8 @@ function triggerReminder(task, isLeading = false) {
 
 function showInAppAlertModal(task, isLeading = false) {
   AppState.activeAlertTask = task;
+  AppState.activeAlertIsLeading = isLeading;
+  AppState.lastAlertRepeatTime = Date.now();
 
   document.getElementById("alert-task-title").textContent = task.title;
   const [h, m] = task.time.split(":");
@@ -1362,7 +1437,7 @@ function renderSelectedDayPreview() {
 // --- Update Dashboard Stats & Counters ---
 function updateMetrics() {
   const todayStr = getLocalDateString(new Date());
-  const pending = AppState.tasks.filter(t => t.date === todayStr && t.status === "pending").length;
+  const pending = AppState.tasks.filter(t => t.date === todayStr && t.status !== "completed" && t.status !== "pushed").length;
   const completed = AppState.tasks.filter(t => t.status === "completed").length;
   const carried = AppState.tasks.filter(t => t.carriedFrom).length;
 
@@ -1438,6 +1513,114 @@ function formatMarkdown(text) {
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/`(.*?)`/g, '<code>$1</code>');
+}
+
+// --- Custom AI Assistant Personalization Settings ---
+function updateAssistantNameUI() {
+  const aiName = AppState.preferences?.aiName || "Kairos";
+  const sidebarHeader = document.getElementById("assistant-name-sidebar");
+  if (sidebarHeader) {
+    sidebarHeader.textContent = aiName;
+  }
+  const inputEl = document.getElementById("ai-name-setting");
+  if (inputEl && document.activeElement !== inputEl) {
+    inputEl.value = aiName;
+  }
+  const fab = document.getElementById("mobile-chat-fab");
+  if (fab) {
+    fab.setAttribute("title", `Open ${aiName} Assistant`);
+  }
+  renderChatHistory();
+}
+
+function saveUserPreferences() {
+  if (db && currentUser) {
+    db.collection("users").doc(currentUser.uid).set({
+      preferences: AppState.preferences
+    }, { merge: true })
+    .then(() => {
+      console.log("Preferences successfully merged in Firestore.");
+    })
+    .catch(err => console.error("Merging preferences failed:", err));
+  } else {
+    saveState();
+    updateAssistantNameUI();
+  }
+}
+
+function syncProfileFromFirestore(uid) {
+  if (userProfileUnsubscribe) {
+    userProfileUnsubscribe();
+  }
+  userProfileUnsubscribe = db.collection("users").doc(uid)
+    .onSnapshot(doc => {
+      if (doc.exists) {
+        const data = doc.data();
+        if (data.preferences) {
+          AppState.preferences = { ...AppState.preferences, ...data.preferences };
+        } else {
+          AppState.preferences.aiName = AppState.preferences.aiName || "Kairos";
+        }
+        updateAssistantNameUI();
+      }
+    }, err => {
+      console.error("Profile sync error:", err);
+    });
+}
+
+// --- Metrics Modal Display ---
+function openMetricsModal(title, tasks) {
+  const overlay = document.getElementById("metrics-modal-overlay");
+  const titleEl = document.getElementById("metrics-modal-title");
+  const contentEl = document.getElementById("metrics-modal-content");
+  if (!overlay || !titleEl || !contentEl) return;
+
+  titleEl.textContent = title;
+  contentEl.innerHTML = "";
+
+  if (tasks.length === 0) {
+    contentEl.innerHTML = `<p class="empty-state-text" style="text-align: center; padding: 20px 0;">No tasks found.</p>`;
+  } else {
+    tasks.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.time.localeCompare(b.time);
+    });
+
+    tasks.forEach(task => {
+      const item = document.createElement("div");
+      item.style.padding = "12px";
+      item.style.marginBottom = "10px";
+      item.style.background = "rgba(255, 255, 255, 0.03)";
+      item.style.border = "1px solid rgba(255, 255, 255, 0.05)";
+      item.style.borderRadius = "8px";
+      item.style.display = "flex";
+      item.style.flexDirection = "column";
+      item.style.gap = "6px";
+      
+      const priorityLabel = priorityLabels[task.priority] || task.priority;
+      const statusLabel = statusLabels[task.status] || task.status;
+      
+      let dateText = task.date;
+      if (task.carriedFrom) {
+        dateText += ` (Carried from ${task.carriedFrom})`;
+      }
+
+      item.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+          <strong style="color: #fff; font-size: 14px; font-weight: 500; text-decoration: ${task.status === 'completed' ? 'line-through' : 'none'}; opacity: ${task.status === 'completed' ? '0.6' : '1'};">${task.title}</strong>
+          <span class="notion-tag status-${task.status}" style="font-size: 10px; padding: 2px 6px;">${statusLabel}</span>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 11px; color: var(--text-muted);">
+          <span>📅 ${dateText}</span>
+          <span>⏰ ${task.time}</span>
+          <span style="color: ${task.priority === 'high' ? 'var(--accent-pink)' : task.priority === 'medium' ? 'var(--accent-cyan)' : 'var(--text-muted)'}; font-weight: 600;">• ${priorityLabel.toUpperCase()}</span>
+        </div>
+      `;
+      contentEl.appendChild(item);
+    });
+  }
+
+  overlay.classList.remove("hidden");
 }
 
 // --- Personal Assistant Interaction (Chat Console) ---
@@ -1650,6 +1833,13 @@ function parseCommand(cmd) {
   let text = cmd.trim();
   if (!text) return;
 
+  // Strip custom assistant name prefix
+  const aiName = AppState.preferences?.aiName || "Kairos";
+  const namePrefixRegex = new RegExp(`^(?:hey\\s+)?${aiName}[,:\\s]+`, "i");
+  if (namePrefixRegex.test(text)) {
+    text = text.replace(namePrefixRegex, "").trim();
+  }
+
   // Detect routing prefix and strip it
   let isManualSource = false;
   const manualPrefixRegex = /^\b(?:add\s+tasks|add\s+task|add\s+todos|add\s+todo|add|todos|todo|tasks|task|schedule\s+tasks|schedule\s+task|schedule)\b\s*:?\s*/i;
@@ -1833,6 +2023,7 @@ function initEventListeners() {
             snapshot.forEach(doc => {
               batch.delete(doc.ref);
             });
+            logUserActivity("clear_chat");
             return batch.commit();
           })
           .then(() => {
@@ -1857,61 +2048,134 @@ function initEventListeners() {
   }
 
 
-  // Reschedule modal
+  // Reschedule / Edit modal
   document.getElementById("reschedule-modal-close").addEventListener("click", closeRescheduleModal);
   document.getElementById("reschedule-modal-cancel").addEventListener("click", closeRescheduleModal);
   document.getElementById("reschedule-modal-form").addEventListener("submit", handleRescheduleSubmit);
 
+  // Save Assistant Name Button click handler
+  const saveAiNameBtn = document.getElementById("save-ai-name-btn");
+  if (saveAiNameBtn) {
+    saveAiNameBtn.addEventListener("click", () => {
+      const input = document.getElementById("ai-name-setting");
+      if (input) {
+        const newName = input.value.trim();
+        if (newName) {
+          AppState.preferences.aiName = newName;
+          saveUserPreferences();
+          logUserActivity("change_ai_name", { newName: newName });
+          addAssistantMessage(`🤖 My name has been changed to **${newName}**!`);
+        }
+      }
+    });
+  }
+
+  // Discuss in Chat action
+  const discussBtn = document.getElementById("edit-task-discuss-btn");
+  if (discussBtn) {
+    discussBtn.addEventListener("click", () => {
+      const taskId = document.getElementById("reschedule-task-id").value;
+      const task = AppState.tasks.find(t => t.id === taskId);
+      if (task) {
+        const input = document.getElementById("pa-command-input");
+        if (input) {
+          input.value = `Discuss task: ${task.title}`;
+        }
+        closeRescheduleModal();
+        toggleSidebar(true);
+      }
+    });
+  }
+
+  // Dashboard Stats Cards Click Actions
+  const pendingCard = document.getElementById("metric-card-pending");
+  if (pendingCard) {
+    pendingCard.addEventListener("click", () => {
+      const todayStr = getLocalDateString(new Date());
+      const tasks = AppState.tasks.filter(t => t.date === todayStr && t.status !== "completed" && t.status !== "pushed");
+      openMetricsModal("Pending Today", tasks);
+    });
+  }
+
+  const completedCard = document.getElementById("metric-card-completed");
+  if (completedCard) {
+    completedCard.addEventListener("click", () => {
+      const tasks = AppState.tasks.filter(t => t.status === "completed");
+      openMetricsModal("Completed Tasks", tasks);
+    });
+  }
+
+  const carriedCard = document.getElementById("metric-card-carried");
+  if (carriedCard) {
+    carriedCard.addEventListener("click", () => {
+      const tasks = AppState.tasks.filter(t => t.carriedFrom);
+      openMetricsModal("Carried Forward Tasks", tasks);
+    });
+  }
+
+  // Metrics Modal Close
+  const metricsModalClose = document.getElementById("metrics-modal-close");
+  if (metricsModalClose) {
+    metricsModalClose.addEventListener("click", () => {
+      document.getElementById("metrics-modal-overlay").classList.add("hidden");
+    });
+  }
+
+  const metricsModalOverlay = document.getElementById("metrics-modal-overlay");
+  if (metricsModalOverlay) {
+    metricsModalOverlay.addEventListener("click", (e) => {
+      if (e.target === metricsModalOverlay) {
+        metricsModalOverlay.classList.add("hidden");
+      }
+    });
+  }
+
   // Alert overlay actions
-  document.getElementById("alert-complete-btn").addEventListener("click", () => {
-    if (AppState.activeAlertTask) toggleTaskComplete(AppState.activeAlertTask.id);
-    hideInAppAlertModal();
-  });
+  const alertCompleteBtn = document.getElementById("alert-complete-btn");
+  if (alertCompleteBtn) {
+    alertCompleteBtn.addEventListener("click", () => {
+      if (AppState.activeAlertTask) toggleTaskComplete(AppState.activeAlertTask.id);
+      hideInAppAlertModal();
+    });
+  }
 
-  document.getElementById("alert-postpone-btn").addEventListener("click", () => {
-    if (AppState.activeAlertTask) {
-      const task = AppState.activeAlertTask;
-      const [h, m] = task.time.split(":");
-      const d = new Date();
-      d.setHours(parseInt(h));
-      d.setMinutes(parseInt(m) + 15);
-      const newTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const snooze5 = document.getElementById("alert-snooze-5-btn");
+  if (snooze5) {
+    snooze5.addEventListener("click", () => snoozeActiveTask(5));
+  }
+  const snooze15 = document.getElementById("alert-snooze-15-btn");
+  if (snooze15) {
+    snooze15.addEventListener("click", () => snoozeActiveTask(15));
+  }
+  const snooze30 = document.getElementById("alert-snooze-30-btn");
+  if (snooze30) {
+    snooze30.addEventListener("click", () => snoozeActiveTask(30));
+  }
 
-      if (db && currentUser) {
-        firestoreUpdateTask(task.id, { time: newTime, notified: false, dueTimestamp: getTaskTimestamp(task.date, newTime) })
-          .then(() => addAssistantMessage(`🕒 Postponed: "**${task.title}**" by 15 mins.`));
-      } else {
-        task.time = newTime;
-        task.notified = false;
-        saveState();
-        refreshAllViews();
-        addAssistantMessage(`🕒 Postponed: "${task.title}" by 15 mins.`);
+  const alertCarryBtn = document.getElementById("alert-carry-btn");
+  if (alertCarryBtn) {
+    alertCarryBtn.addEventListener("click", () => {
+      if (AppState.activeAlertTask) {
+        const task = AppState.activeAlertTask;
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = getLocalDateString(tomorrow);
+
+        if (db && currentUser) {
+          firestoreUpdateTask(task.id, { carriedFrom: task.date, date: tomorrowStr, notified: false })
+            .then(() => addAssistantMessage(`🔄 "**${task.title}**" carried to tomorrow.`));
+        } else {
+          task.carriedFrom = task.date;
+          task.date = tomorrowStr;
+          task.notified = false;
+          saveState();
+          refreshAllViews();
+          addAssistantMessage(`🔄 "${task.title}" carried to tomorrow.`);
+        }
       }
-    }
-    hideInAppAlertModal();
-  });
-
-  document.getElementById("alert-carry-btn").addEventListener("click", () => {
-    if (AppState.activeAlertTask) {
-      const task = AppState.activeAlertTask;
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = getLocalDateString(tomorrow);
-
-      if (db && currentUser) {
-        firestoreUpdateTask(task.id, { carriedFrom: task.date, date: tomorrowStr, notified: false })
-          .then(() => addAssistantMessage(`🔄 "**${task.title}**" carried to tomorrow.`));
-      } else {
-        task.carriedFrom = task.date;
-        task.date = tomorrowStr;
-        task.notified = false;
-        saveState();
-        refreshAllViews();
-        addAssistantMessage(`🔄 "${task.title}" carried to tomorrow.`);
-      }
-    }
-    hideInAppAlertModal();
-  });
+      hideInAppAlertModal();
+    });
+  }
 
   const dismissBtn = document.getElementById("alert-dismiss-btn");
   if (dismissBtn) {
@@ -1958,15 +2222,18 @@ function initEventListeners() {
   });
 }
 
-// --- Reschedule Single Task Modal handlers ---
+// --- Reschedule/Edit Single Task Modal handlers ---
 function openRescheduleModal(taskId) {
   const task = AppState.tasks.find(t => t.id === taskId);
   if (task) {
     document.getElementById("reschedule-task-id").value = task.id;
-    document.getElementById("reschedule-task-title-text").textContent = task.title;
-    document.getElementById("reschedule-date").value = task.date;
-    document.getElementById("reschedule-time").value = task.time;
+    document.getElementById("reschedule-task-title").value = task.title || "";
+    document.getElementById("reschedule-date").value = task.date || "";
+    document.getElementById("reschedule-time").value = task.time || "";
+    document.getElementById("reschedule-priority").value = task.priority || "medium";
+    document.getElementById("reschedule-repeat").value = task.reminderSchedule || "once";
     document.getElementById("reschedule-modal-overlay").classList.remove("hidden");
+    document.getElementById("reschedule-task-title").focus();
   }
 }
 
@@ -1977,36 +2244,79 @@ function closeRescheduleModal() {
 function handleRescheduleSubmit(e) {
   e.preventDefault();
   const taskId = document.getElementById("reschedule-task-id").value;
+  const title = document.getElementById("reschedule-task-title").value.trim();
   const date = document.getElementById("reschedule-date").value;
   const time = document.getElementById("reschedule-time").value;
+  const priority = document.getElementById("reschedule-priority").value;
+  const reminderSchedule = document.getElementById("reschedule-repeat").value;
 
   const task = AppState.tasks.find(t => t.id === taskId);
-  if (task && date && time) {
+  if (task && title && date && time) {
     let nextNotified = task.notified;
     const now = new Date();
     const todayStr = getLocalDateString(now);
     const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    if (date > todayStr || (date === todayStr && time > currentTimeStr)) {
-      nextNotified = false;
+    
+    // Reset notification fired state if the schedule/time is changed to the future
+    if (title !== task.title || date !== task.date || time !== task.time || reminderSchedule !== task.reminderSchedule) {
+      if (date > todayStr || (date === todayStr && time > currentTimeStr)) {
+        nextNotified = false;
+      }
     }
 
+    const updates = {
+      title,
+      date,
+      time,
+      priority,
+      reminderSchedule,
+      notified: nextNotified,
+      dueTimestamp: getTaskTimestamp(date, time)
+    };
+
     if (db && currentUser) {
-      firestoreUpdateTask(taskId, { date, time, notified: nextNotified, dueTimestamp: getTaskTimestamp(date, time) })
+      firestoreUpdateTask(taskId, updates)
         .then(() => {
           closeRescheduleModal();
-          addAssistantMessage(`🔄 Rescheduled: "**${task.title}**" to ${date} at ${time}.`);
+          addAssistantMessage(`🔄 Updated Task: "**${title}**" (${priority}, scheduled ${date} at ${time}).`);
         })
-        .catch(err => console.error("Reschedule failed:", err));
+        .catch(err => console.error("Update task failed:", err));
     } else {
-      task.date = date;
-      task.time = time;
-      task.notified = nextNotified;
+      Object.assign(task, updates);
       saveState();
       closeRescheduleModal();
       refreshAllViews();
-      addAssistantMessage(`🔄 Rescheduled: "${task.title}" to ${date} at ${time}.`);
+      addAssistantMessage(`🔄 Updated Task: "${title}" (${priority}, scheduled ${date} at ${time}).`);
     }
   }
+}
+
+function snoozeActiveTask(minutes) {
+  if (AppState.activeAlertTask) {
+    const task = AppState.activeAlertTask;
+    const [h, m] = task.time.split(":");
+    const d = new Date();
+    d.setHours(parseInt(h));
+    d.setMinutes(parseInt(m) + minutes);
+    const newTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+    const updates = {
+      time: newTime,
+      notified: false,
+      dueTimestamp: getTaskTimestamp(task.date, newTime)
+    };
+
+    if (db && currentUser) {
+      firestoreUpdateTask(task.id, updates)
+        .then(() => addAssistantMessage(`🕒 Snoozed: "**${task.title}**" by ${minutes} mins.`));
+    } else {
+      Object.assign(task, updates);
+      saveState();
+      refreshAllViews();
+      addAssistantMessage(`🕒 Snoozed: "${task.title}" by ${minutes} mins.`);
+    }
+  }
+  hideInAppAlertModal();
 }
 
 // --- Date and Time Helper Functions ---

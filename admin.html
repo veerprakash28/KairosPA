@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>KairosPA - Administration Panel</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%230c0c16' stroke='%23e11d48' stroke-width='8'/><path d='M50 20v30l15 15' stroke='%238222ff' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/><circle cx='50' cy='50' r='5' fill='%23e11d48'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=1.0.4">
+</head>
+<body class="admin-body">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <!-- Admin Auth Overlay -->
+  <div id="admin-auth-overlay" class="auth-overlay">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="avatar-container">
+          <div class="avatar-ring ring-outer" style="border-color: rgba(225, 29, 72, 0.4)"></div>
+          <div class="avatar-glow" style="background: radial-gradient(circle, rgba(225, 29, 72, 0.3) 0%, transparent 70%);"></div>
+          <div class="avatar-icon">
+            <svg viewBox="0 0 100 100" width="32" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="25" y="25" width="50" height="50" rx="10" stroke="#e11d48" stroke-width="6"/>
+              <path d="M50 40V60M40 50H60" stroke="#e11d48" stroke-width="6" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+        <h2>KairosPA Admin</h2>
+        <p>Enter administrator credentials to access dashboard audits</p>
+      </div>
+
+      <form id="admin-login-form" class="auth-form">
+        <div class="form-group">
+          <label for="admin-email">Admin Email</label>
+          <input type="email" id="admin-email" placeholder="admin@kairospa.com" required>
+        </div>
+        <div class="form-group">
+          <label for="admin-password">Password</label>
+          <input type="password" id="admin-password" placeholder="••••••••" required>
+        </div>
+        <div class="auth-error-msg hidden" id="admin-login-error"></div>
+        <button type="submit" class="glow-button-primary full-width-btn" style="width: 100%; margin-top: 10px; background: linear-gradient(135deg, #e11d48, #8222ff);">Authenticate</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Main Dashboard Layout -->
+  <div id="admin-dashboard" class="app-container hidden">
+    <!-- Sidebar: Users Directory -->
+    <aside class="sidebar admin-sidebar">
+      <div class="pa-header">
+        <div class="pa-info">
+          <h2>Admin Console</h2>
+          <span class="pa-status-badge"><span class="status-dot pulsing" style="background: #e11d48; box-shadow: 0 0 8px #e11d48;"></span>Auditing Active</span>
+        </div>
+        <button id="admin-signout-btn" class="glass-button-exit">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 3px; display: inline-block; vertical-align: middle;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          Exit
+        </button>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="admin-search-container">
+        <input type="text" id="admin-user-search" placeholder="Search users by name/email..." autocomplete="off">
+      </div>
+
+      <!-- Users List -->
+      <div class="admin-users-list" id="admin-users-list-container">
+        <div class="empty-state" style="padding: 20px;">
+          <p>Loading users...</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Area -->
+    <main class="main-content admin-main">
+      <!-- Top header bar -->
+      <header class="dashboard-header">
+        <div class="header-left">
+          <div class="header-welcome">
+            <h1 id="selected-user-header">Select a User</h1>
+            <p id="selected-user-sub-header">Select a user profile from the sidebar to inspect their workspace audits</p>
+          </div>
+        </div>
+      </header>
+
+      <!-- Profile Summary Card (Full Width horizontal banner card) -->
+      <div id="user-profile-summary-card" class="glass-card user-profile-banner hidden" style="margin-bottom: 24px;">
+        <div class="profile-banner-content">
+          <div class="profile-banner-left">
+            <div class="user-avatar-large" id="summary-avatar-container">
+              <!-- Loaded dynamically via js -->
+            </div>
+            <div class="profile-banner-info">
+              <h2 id="summary-name">User Profile Name</h2>
+              <span id="summary-email">user@email.com</span>
+            </div>
+          </div>
+          <div class="profile-banner-right">
+            <div class="profile-metadata-item">
+              <span class="meta-label">User ID</span>
+              <strong id="summary-uid">UID: ---</strong>
+            </div>
+            <div class="profile-metadata-item">
+              <span class="meta-label">Last Active</span>
+              <strong id="summary-active">Last Active: ---</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Audits Container -->
+      <div id="user-details-container" class="admin-dashboard-grid hidden">
+        <!-- Left Column: Tasks Inspector -->
+        <div class="board-column admin-tasks-column">
+          <div class="column-header">
+            <h3>User Task Directory</h3>
+            <span class="task-count-badge" id="tasks-count-label">0 Total</span>
+          </div>
+
+          <!-- Search filter for tasks -->
+          <div class="admin-task-search-container" style="margin-bottom: 12px;">
+            <input type="text" id="admin-task-search" placeholder="Search tasks by title, priority, status, or date..." autocomplete="off">
+          </div>
+          
+          <div class="admin-tasks-list" id="admin-tasks-list-container">
+            <!-- Dynamic task items go here -->
+          </div>
+
+          <!-- Pagination controls for tasks -->
+          <div class="admin-tasks-pagination" id="admin-tasks-pagination-container">
+            <!-- Dynamic pagination buttons -->
+          </div>
+        </div>
+
+        <!-- Right Column: User Activity Logs -->
+        <div class="board-column admin-logs-column">
+          <div class="column-header">
+            <h3>Activity Logs Feed</h3>
+          </div>
+
+          <!-- Search filter for logs -->
+          <div class="admin-log-search-container" style="margin-bottom: 12px;">
+            <input type="text" id="admin-log-search" placeholder="Search activity logs by action, title, or date..." autocomplete="off">
+          </div>
+
+          <div class="admin-logs-timeline" id="admin-logs-container">
+            <!-- Dynamic logs go here -->
+          </div>
+
+          <!-- Pagination controls for logs -->
+          <div class="admin-logs-pagination" id="admin-logs-pagination-container">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Firebase Scripts (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="admin.js?v=1.0.4"></script>
+</body>
+</html>
