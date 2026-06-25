@@ -440,20 +440,34 @@
               </select>
             </div>
             <div class="form-group">
-              <label for="reschedule-repeat">Reminder Schedule</label>
-              <select id="reschedule-repeat">
-                <option value="once">Once (at scheduled time)</option>
+              <label for="reschedule-reminder-schedule">Reminder Alert</label>
+              <select id="reschedule-reminder-schedule">
+                <option value="once">On due date only</option>
                 <option value="daily-lead">Daily leading up to event</option>
                 <option value="weekly-lead">Weekly leading up to event</option>
               </select>
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reschedule-task-repeat">Repeat</label>
+              <select id="reschedule-task-repeat">
+                <option value="none">None</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="reschedule-source">Task Type</label>
+              <select id="reschedule-source">
+                <option value="manual">Task</option>
+                <option value="chat">Conversation</option>
+              </select>
+            </div>
+          </div>
           <div class="form-footer" style="display: flex; flex-direction: column; gap: 10px;">
             <button type="submit" class="glow-button-primary">Save Changes</button>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-              <button type="button" id="edit-task-discuss-btn" class="glass-button-secondary">Discuss in Chat</button>
-              <button type="button" id="reschedule-modal-cancel" class="glass-button-secondary">Cancel</button>
-            </div>
+            <button type="button" id="reschedule-modal-cancel" class="glass-button-secondary">Cancel</button>
           </div>
         </form>
       </div>

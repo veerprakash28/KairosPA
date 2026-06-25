@@ -1039,9 +1039,6 @@ function renderTaskCard(container, task, currentTimeStr) {
   if (task.carriedFrom) item.classList.add("carried");
 
   item.innerHTML = `
-    <div class="timeline-marker">
-      <div class="marker-node"></div>
-    </div>
     <div class="task-card">
       <div class="task-main-info">
         <label class="task-checkbox-container">
@@ -1050,15 +1047,15 @@ function renderTaskCard(container, task, currentTimeStr) {
         </label>
         <div class="task-text">
           <h4 class="${task.status === 'completed' ? 'completed-text' : ''}">${task.title}</h4>
-          <div class="task-meta-row">
-            <span class="task-time-pill">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-              </svg>
-              ${displayTime}
-            </span>
-            <div class="task-notion-tags">
+          <span class="task-time-pill" style="margin-top: 4px; display: inline-flex; align-items: center; gap: 4px;">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            ${displayTime}
+          </span>
+          <div class="task-meta-row" style="margin-top: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <div class="task-notion-tags" style="display: flex; align-items: center; gap: 6px;">
               <span class="notion-tag status-${task.status}" onclick="showStatusDropdown('${task.id}', event)">${statusLabels[task.status] || task.status}</span>
               <span class="notion-tag prio-${task.priority}" onclick="showPriorityDropdown('${task.id}', event)">${priorityLabels[task.priority] || task.priority}</span>
             </div>
@@ -2231,7 +2228,9 @@ function openRescheduleModal(taskId) {
     document.getElementById("reschedule-date").value = task.date || "";
     document.getElementById("reschedule-time").value = task.time || "";
     document.getElementById("reschedule-priority").value = task.priority || "medium";
-    document.getElementById("reschedule-repeat").value = task.reminderSchedule || "once";
+    document.getElementById("reschedule-reminder-schedule").value = task.reminderSchedule || "once";
+    document.getElementById("reschedule-task-repeat").value = task.repeat || "none";
+    document.getElementById("reschedule-source").value = task.source || "manual";
     document.getElementById("reschedule-modal-overlay").classList.remove("hidden");
     document.getElementById("reschedule-task-title").focus();
   }
@@ -2248,7 +2247,9 @@ function handleRescheduleSubmit(e) {
   const date = document.getElementById("reschedule-date").value;
   const time = document.getElementById("reschedule-time").value;
   const priority = document.getElementById("reschedule-priority").value;
-  const reminderSchedule = document.getElementById("reschedule-repeat").value;
+  const reminderSchedule = document.getElementById("reschedule-reminder-schedule").value;
+  const repeat = document.getElementById("reschedule-task-repeat").value;
+  const source = document.getElementById("reschedule-source").value;
 
   const task = AppState.tasks.find(t => t.id === taskId);
   if (task && title && date && time) {
@@ -2270,6 +2271,8 @@ function handleRescheduleSubmit(e) {
       time,
       priority,
       reminderSchedule,
+      repeat,
+      source,
       notified: nextNotified,
       dueTimestamp: getTaskTimestamp(date, time)
     };
