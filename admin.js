@@ -24,6 +24,13 @@ let filteredUserTasks = [];
 let currentTasksPage = 1;
 const tasksPerPage = 5;
 
+// Pagination & search state for user instructions
+let currentUserInstructions = [];
+let filteredUserInstructions = [];
+let userInstructionsUnsubscribe = null;
+let currentInstructionsPage = 1;
+const instructionsPerPage = 5;
+
 // Load Firebase configuration from config.json
 async function loadFirebaseConfig() {
   try {
@@ -143,6 +150,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       filterAndRenderTasks();
     });
   }
+
+  // Handle Instruction Search Input
+  const instSearchInput = document.getElementById("admin-instruction-search");
+  if (instSearchInput) {
+    instSearchInput.addEventListener("input", () => {
+      currentInstructionsPage = 1;
+      filterAndRenderInstructions();
+    });
+  }
 });
 
 function resetAdminUI() {
@@ -155,6 +171,10 @@ function resetAdminUI() {
   filteredUserTasks = [];
   currentTasksPage = 1;
 
+  currentUserInstructions = [];
+  filteredUserInstructions = [];
+  currentInstructionsPage = 1;
+
   if (tasksListenerUnsubscribe) {
     tasksListenerUnsubscribe();
     tasksListenerUnsubscribe = null;
@@ -163,6 +183,10 @@ function resetAdminUI() {
     logsListenerUnsubscribe();
     logsListenerUnsubscribe = null;
   }
+  if (userInstructionsUnsubscribe) {
+    userInstructionsUnsubscribe();
+    userInstructionsUnsubscribe = null;
+  }
 
   // Clear search fields
   const logSearchInput = document.getElementById("admin-log-search");
@@ -170,6 +194,9 @@ function resetAdminUI() {
 
   const taskSearchInput = document.getElementById("admin-task-search");
   if (taskSearchInput) taskSearchInput.value = "";
+
+  const instSearchInput = document.getElementById("admin-instruction-search");
+  if (instSearchInput) instSearchInput.value = "";
 
   document.getElementById("user-profile-summary-card").classList.add("hidden");
   document.getElementById("user-details-container").classList.add("hidden");
@@ -324,6 +351,34 @@ function selectUser(user) {
     }, err => {
       console.error("Error loading user logs:", err);
       const container = document.getElementById("admin-logs-container");
+      if (container) {
+        container.innerHTML = `
+          <div class="empty-state" style="padding: 20px; border: 1px dashed rgba(239, 68, 68, 0.4); border-radius: 8px;">
+            <p style="color: #ef4444; margin-bottom: 4px; font-weight: 600;">⚠️ Access Denied / Error</p>
+            <p style="font-size: 0.75rem; color: #94a3b8;">${err.message || 'Firestore security rules blocking access.'}</p>
+          </div>
+        `;
+      }
+    });
+
+  // Listen to instructions (including deleted)
+  if (userInstructionsUnsubscribe) userInstructionsUnsubscribe();
+  userInstructionsUnsubscribe = db.collection("users").doc(user.uid).collection("instructions")
+    .onSnapshot(snapshot => {
+      let insts = [];
+      snapshot.forEach(doc => {
+        insts.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Sort instructions client-side: alphabetically by title
+      insts.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+
+      currentUserInstructions = insts;
+      currentInstructionsPage = 1;
+      filterAndRenderInstructions();
+    }, err => {
+      console.error("Error loading user instructions:", err);
+      const container = document.getElementById("admin-instructions-list-container");
       if (container) {
         container.innerHTML = `
           <div class="empty-state" style="padding: 20px; border: 1px dashed rgba(239, 68, 68, 0.4); border-radius: 8px;">
@@ -653,7 +708,134 @@ function formatActionType(action) {
     "delete_task": "Task Deleted (Soft)",
     "admin_restore_task": "Task Restored by Admin",
     "clear_chat": "Chat Logs Cleared",
-    "carry_forward_all": "Tasks Rolled Over to Today"
+    "carry_forward_all": "Tasks Rolled Over to Today",
+    "create_instruction": "Instruction Created",
+    "edit_instruction": "Instruction Updated",
+    "delete_instruction": "Instruction Deleted (Soft)",
+    "admin_restore_instruction": "Instruction Restored by Admin"
   };
   return mapping[action] || action || "Unknown Action";
+}
+
+// --- Instructions Audit Directory Helper Functions ---
+function filterAndRenderInstructions() {
+  const query = (document.getElementById("admin-instruction-search")?.value || "").toLowerCase().trim();
+  if (!query) {
+    filteredUserInstructions = [...currentUserInstructions];
+  } else {
+    filteredUserInstructions = currentUserInstructions.filter(inst => {
+      return (inst.title || "").toLowerCase().includes(query) ||
+             (inst.category || "").toLowerCase().includes(query) ||
+             (inst.description || "").toLowerCase().includes(query);
+    });
+  }
+  currentInstructionsPage = 1;
+  renderInstructionsPage();
+}
+
+function renderInstructionsPage() {
+  const container = document.getElementById("admin-instructions-list-container");
+  const paginationContainer = document.getElementById("admin-instructions-pagination-container");
+  const countLabel = document.getElementById("instructions-count-label");
+  if (!container) return;
+
+  countLabel.textContent = `${filteredUserInstructions.length} matching / ${currentUserInstructions.length} Total`;
+
+  if (filteredUserInstructions.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 40px 20px;">
+        <h4>No Instructions Found</h4>
+        <p>No instructions match the filter criteria.</p>
+      </div>
+    `;
+    if (paginationContainer) paginationContainer.innerHTML = "";
+    return;
+  }
+
+  const totalPages = Math.ceil(filteredUserInstructions.length / instructionsPerPage);
+  if (currentInstructionsPage > totalPages) currentInstructionsPage = totalPages;
+  if (currentInstructionsPage < 1) currentInstructionsPage = 1;
+
+  const startIndex = (currentInstructionsPage - 1) * instructionsPerPage;
+  const endIndex = Math.min(startIndex + instructionsPerPage, filteredUserInstructions.length);
+  const pageInsts = filteredUserInstructions.slice(startIndex, endIndex);
+
+  container.innerHTML = "";
+  pageInsts.forEach(inst => {
+    const div = document.createElement("div");
+    div.className = `admin-task-card ${inst.deleted ? "deleted-task" : ""}`;
+    
+    const categoryLabel = (inst.category || "general").toUpperCase();
+    const statusText = inst.deleted ? "DELETED" : categoryLabel;
+    
+    div.innerHTML = `
+      <div class="task-card-meta">
+        <span class="status-tag status-${inst.deleted ? 'deleted' : 'active'}">${statusText}</span>
+      </div>
+      <h4>${inst.title}</h4>
+      <div style="font-size: 0.82rem; color: #cbd5e1; max-height: 80px; overflow-y: auto; margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.15); border-radius: 4px; white-space: pre-wrap;">${inst.description}</div>
+      <div class="task-card-actions" style="margin-top: 12px; display: flex; gap: 8px;">
+        ${inst.deleted ? `
+          <button class="glass-button-secondary restore-btn" onclick="restoreUserInstruction('${inst.id}')">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 21v-5h5"/></svg>
+            Restore Instruction
+          </button>
+        ` : `
+          <button class="glass-button-danger delete-btn" onclick="deleteUserInstruction('${inst.id}')">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
+            Delete
+          </button>
+        `}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+
+  if (paginationContainer) {
+    if (filteredUserInstructions.length <= instructionsPerPage) {
+      paginationContainer.innerHTML = "";
+    } else {
+      paginationContainer.innerHTML = `
+        <button id="inst-prev-btn" ${currentInstructionsPage === 1 ? "disabled" : ""}>&larr; Prev</button>
+        <span>Page ${currentInstructionsPage} of ${totalPages}</span>
+        <button id="inst-next-btn" ${currentInstructionsPage === totalPages ? "disabled" : ""}>Next &rarr;</button>
+      `;
+
+      document.getElementById("inst-prev-btn").addEventListener("click", () => {
+        currentInstructionsPage--;
+        renderInstructionsPage();
+      });
+
+      document.getElementById("inst-next-btn").addEventListener("click", () => {
+        currentInstructionsPage++;
+        renderInstructionsPage();
+      });
+    }
+  }
+}
+
+function deleteUserInstruction(instId) {
+  if (!selectedUserId || !db) return;
+  if (confirm("Are you sure you want to soft-delete this instruction?")) {
+    db.collection("users").doc(selectedUserId).collection("instructions").doc(instId).update({
+      deleted: true,
+      deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(() => {
+      console.log(`Instruction ${instId} soft-deleted successfully.`);
+    })
+    .catch(err => alert("Error soft-deleting instruction: " + err.message));
+  }
+}
+
+function restoreUserInstruction(instId) {
+  if (!selectedUserId || !db) return;
+  db.collection("users").doc(selectedUserId).collection("instructions").doc(instId).update({
+    deleted: false,
+    deletedAt: null
+  })
+  .then(() => {
+    console.log(`Instruction ${instId} restored successfully.`);
+  })
+  .catch(err => alert("Error restoring instruction: " + err.message));
 }

@@ -182,8 +182,16 @@
         </div>
       </header>
 
-      <!-- Dashboard Metrics -->
-      <section class="metrics-grid">
+      <!-- View Tab Navigation -->
+      <nav class="view-tabs">
+        <button class="tab-btn active" id="tab-dashboard">Dashboard</button>
+        <button class="tab-btn" id="tab-instructions">Important Instructions</button>
+      </nav>
+
+      <!-- View Wrapper for Dashboard -->
+      <div id="dashboard-view">
+        <!-- Dashboard Metrics -->
+        <section class="metrics-grid">
         <div class="metric-card" id="metric-card-pending" style="cursor: pointer;">
           <div class="metric-icon bg-pending">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
@@ -270,7 +278,10 @@
                 <p>Would you like to reschedule them to today?</p>
               </div>
             </div>
-            <button id="carry-all-forward-btn" class="glass-button-accent">Reschedule All</button>
+            <div class="banner-actions" style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px;">
+              <button id="carry-all-forward-btn" class="glass-button-accent" style="width: 100%;">Reschedule All</button>
+              <button id="manage-pending-btn" class="glass-button-secondary" style="width: 100%; padding: 8px; font-size: 0.85rem; border-color: rgba(255,255,255,0.15);">Manage Tasks</button>
+            </div>
           </div>
 
           <!-- Calendar Widget -->
@@ -305,6 +316,21 @@
           </div>
         </article>
       </section>
+      </div> <!-- end of dashboard-view -->
+
+      <!-- Important Instructions View -->
+      <div id="instructions-view" class="hidden">
+        <div class="instructions-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div>
+            <h2 style="font-size: 1.5rem; font-weight: 700; color: #fff; margin: 0;">Important Instructions & Rules</h2>
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 4px;">Store reference guides, rules, steps, and procedures for reference.</p>
+          </div>
+          <button id="add-instruction-btn" class="glow-button-primary" style="margin: 0;">+ Add Instruction</button>
+        </div>
+        <div id="instructions-grid" class="instructions-grid">
+          <!-- Dynamically populated instruction cards -->
+        </div>
+      </div>
     </main>
 
     <!-- IN-APP POPUP REMINDER MODAL (ALERT OVERLAY) -->
@@ -482,6 +508,91 @@
         </div>
         <div id="metrics-modal-content" style="max-height: 400px; overflow-y: auto; margin-top: 15px;">
           <!-- Tasks list populated dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- PENDING TASKS SELECTIVE RESCHEDULE MODAL -->
+    <div class="modal-overlay hidden" id="pending-tasks-modal-overlay">
+      <div class="modal-card glass-card" style="max-width: 550px;">
+        <div class="modal-header">
+          <h3>Manage Pending Tasks</h3>
+          <button id="pending-tasks-modal-close" class="close-btn">&times;</button>
+        </div>
+        <div style="margin-top: 15px; max-height: 300px; overflow-y: auto;" id="pending-tasks-list-container">
+          <ul id="pending-tasks-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
+            <!-- Pending tasks checklist will be rendered here -->
+          </ul>
+        </div>
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.08);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; color: #fff;">
+              <input type="checkbox" id="pending-select-all" style="width: 16px; height: 16px; accent-color: var(--accent-cyan);">
+              Select All
+            </label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label for="pending-reschedule-date" style="font-size: 0.85rem; color: #94a3b8;">Reschedule to:</label>
+              <input type="date" id="pending-reschedule-date" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #fff; font-family: inherit; font-size: 0.85rem;" required>
+            </div>
+          </div>
+          <div class="form-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button type="button" id="pending-tasks-cancel" class="glass-button-secondary">Cancel</button>
+            <button type="button" id="reschedule-selected-btn" class="glow-button-primary" style="margin: 0;">Reschedule Selected</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMPORTANT INSTRUCTION ADD/EDIT MODAL -->
+    <div class="modal-overlay hidden" id="instruction-modal-overlay">
+      <div class="modal-card glass-card" style="max-width: 500px;">
+        <div class="modal-header">
+          <h3 id="instruction-modal-title">Add Important Instruction</h3>
+          <button id="instruction-modal-close" class="close-btn">&times;</button>
+        </div>
+        <form id="instruction-modal-form" style="margin-top: 15px;">
+          <input type="hidden" id="instruction-id">
+          <div class="form-group">
+            <label for="instruction-title">Title</label>
+            <input type="text" id="instruction-title" placeholder="e.g. WiFi Password, Deploying Steps, General Rules" required style="width: 100%; box-sizing: border-box;">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="instruction-category">Category</label>
+              <select id="instruction-category">
+                <option value="general" selected>General Info</option>
+                <option value="rules">Rules & Guidelines</option>
+                <option value="steps">Procedures / Steps</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="instruction-desc">Description / Steps Details</label>
+            <textarea id="instruction-desc" rows="6" placeholder="Enter detailed guidelines, passwords, steps or rules..." required style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #fff; padding: 10px; font-family: inherit; font-size: 0.9rem; resize: vertical; outline: none;"></textarea>
+          </div>
+          <div class="form-footer" style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+            <button type="button" id="instruction-modal-cancel" class="glass-button-secondary">Cancel</button>
+            <button type="submit" class="glow-button-primary" style="margin: 0;">Save Instruction</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- DELETE INSTRUCTION CONFIRMATION MODAL -->
+    <div class="modal-overlay hidden" id="confirm-delete-instruction-modal" style="z-index: 1050;">
+      <div class="modal-card glass-card" style="max-width: 400px; text-align: center;">
+        <div style="margin-bottom: 20px; color: var(--status-alert);">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <h3>Delete Instruction?</h3>
+        <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 10px;">Are you sure you want to delete this instruction? This action cannot be undone.</p>
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 25px;">
+          <button type="button" id="delete-instruction-cancel-btn" class="glass-button-secondary">Cancel</button>
+          <button type="button" id="delete-instruction-confirm-btn" class="glow-button-primary" style="background: var(--status-alert); border-color: var(--status-alert); margin: 0;">Delete</button>
         </div>
       </div>
     </div>

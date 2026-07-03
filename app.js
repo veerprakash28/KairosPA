@@ -10,8 +10,10 @@ let fcmMessaging = null;  // Firebase Cloud Messaging for push notifications
 let userTasksUnsubscribe = null;
 let userChatUnsubscribe = null;
 let userProfileUnsubscribe = null;
+let userInstructionsUnsubscribe = null;
 let currentUser = null;
 let firebaseActive = false;
+let isManualLogin = false;
 
 // Load Firebase config from config.json (injected by GitHub Actions on deploy)
 async function loadFirebaseConfig() {
@@ -56,6 +58,7 @@ function initFirebase() {
 // --- Global App State ---
 let AppState = {
   tasks: [],
+  instructions: [],
   preferences: {
     username: "User",
     soundEnabled: true,
@@ -145,12 +148,14 @@ function loadState() {
       });
       AppState.preferences = parsed.preferences || AppState.preferences;
       AppState.chatHistory = parsed.chatHistory || [];
+      AppState.instructions = parsed.instructions || [];
     } catch (e) {
       console.error("Error loading localStorage state:", e);
     }
   } else {
     AppState.tasks = [];
     AppState.chatHistory = [];
+    AppState.instructions = [];
     saveState();
   }
 }
@@ -239,6 +244,7 @@ function initFirebaseAuth() {
 
     auth.signInWithEmailAndPassword(email, password)
       .then(() => {
+        isManualLogin = true;
         logUserActivity("login", { method: "email" });
         document.getElementById("login-email").value = "";
         document.getElementById("login-password").value = "";
@@ -271,6 +277,7 @@ function initFirebaseAuth() {
         return user.updateProfile({ displayName: name });
       })
       .then(() => {
+        isManualLogin = true;
         // Save user profile details to Firestore
         saveUserProfile(auth.currentUser);
         logUserActivity("signup", { method: "email" });
@@ -320,6 +327,7 @@ function initFirebaseAuth() {
         syncTasksFromFirestore(user.uid);
         syncChatFromFirestore(user.uid);
         syncProfileFromFirestore(user.uid);
+        syncInstructionsFromFirestore(user.uid);
 
         // Register FCM push token for this device
         initFcmMessaging(user.uid);
@@ -330,8 +338,12 @@ function initFirebaseAuth() {
         if (settingsSection) settingsSection.classList.remove("hidden");
         if (settingsDivider) settingsDivider.classList.remove("hidden");
 
-        logUserActivity("session_restore", { userAgent: navigator.userAgent });
-        addAssistantMessage(`🔒 Synced! Welcome back, **${displayName}**.`);
+        if (isManualLogin) {
+          addAssistantMessage(`🔒 Synced! Welcome back, **${displayName}**.`);
+          isManualLogin = false;
+        } else {
+          logUserActivity("session_restore", { userAgent: navigator.userAgent });
+        }
       } else {
         currentUser = null;
 
@@ -366,6 +378,10 @@ function initFirebaseAuth() {
         if (userProfileUnsubscribe) {
           userProfileUnsubscribe();
           userProfileUnsubscribe = null;
+        }
+        if (userInstructionsUnsubscribe) {
+          userInstructionsUnsubscribe();
+          userInstructionsUnsubscribe = null;
         }
 
         // Render local state
@@ -470,6 +486,28 @@ function syncChatFromFirestore(uid) {
       renderChatHistory();
     }, err => {
       console.error("Firestore chat sync error:", err);
+    });
+}
+
+// --- Firestore Real-Time Instructions Sync ---
+function syncInstructionsFromFirestore(uid) {
+  if (userInstructionsUnsubscribe) {
+    userInstructionsUnsubscribe();
+  }
+
+  userInstructionsUnsubscribe = db.collection("users").doc(uid).collection("instructions")
+    .onSnapshot(snapshot => {
+      let instList = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (!data.deleted) {
+          instList.push(data);
+        }
+      });
+      AppState.instructions = instList;
+      renderInstructions();
+    }, err => {
+      console.error("Firestore instructions sync error:", err);
     });
 }
 
@@ -622,10 +660,10 @@ function initClock() {
       if (elapsed >= 5 * 60 * 1000) {
         AppState.lastAlertRepeatTime = Date.now();
         playNotificationChime();
-        
+
         const title = AppState.activeAlertTask.title;
         const body = AppState.activeAlertIsLeading ? `Upcoming event on ${AppState.activeAlertTask.date} at ${AppState.activeAlertTask.time}` : `Scheduled for today at ${AppState.activeAlertTask.time}`;
-        
+
         if (Notification.permission === "granted") {
           try {
             new Notification(`⏰ REMINDER: ${title}`, {
@@ -1535,10 +1573,10 @@ function saveUserPreferences() {
     db.collection("users").doc(currentUser.uid).set({
       preferences: AppState.preferences
     }, { merge: true })
-    .then(() => {
-      console.log("Preferences successfully merged in Firestore.");
-    })
-    .catch(err => console.error("Merging preferences failed:", err));
+      .then(() => {
+        console.log("Preferences successfully merged in Firestore.");
+      })
+      .catch(err => console.error("Merging preferences failed:", err));
   } else {
     saveState();
     updateAssistantNameUI();
@@ -1593,10 +1631,10 @@ function openMetricsModal(title, tasks) {
       item.style.display = "flex";
       item.style.flexDirection = "column";
       item.style.gap = "6px";
-      
+
       const priorityLabel = priorityLabels[task.priority] || task.priority;
       const statusLabel = statusLabels[task.status] || task.status;
-      
+
       let dateText = task.date;
       if (task.carriedFrom) {
         dateText += ` (Carried from ${task.carriedFrom})`;
@@ -1758,7 +1796,7 @@ function extractDate(text) {
 
   // 2. Month words: e.g. "on 22 September" or "on September 22" or "on Sept 22"
   const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-  
+
   const wordDateRegex1 = /\b(?:on\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i;
   const wordDateMatch1 = cleanedText.match(wordDateRegex1);
   if (wordDateMatch1) {
@@ -1840,7 +1878,7 @@ function parseCommand(cmd) {
   // Detect routing prefix and strip it
   let isManualSource = false;
   const manualPrefixRegex = /^\b(?:add\s+tasks|add\s+task|add\s+todos|add\s+todo|add|todos|todo|tasks|task|schedule\s+tasks|schedule\s+task|schedule)\b\s*:?\s*/i;
-  
+
   if (manualPrefixRegex.test(text)) {
     isManualSource = true;
     text = text.replace(manualPrefixRegex, "").trim();
@@ -1903,7 +1941,7 @@ function parseCommand(cmd) {
       const timeStr = partInfo.timeStr || inheritedTimeStr;
       const isRelative = partInfo.timeStr ? partInfo.isRelative : inheritedIsRelative;
       const delayMinutes = partInfo.timeStr ? partInfo.delayMinutes : inheritedDelayMinutes;
-      
+
       const cleanedTitle = cleanTaskTitle(partInfo.cleanedText);
       createAndSaveTask(cleanedTitle, timeStr, isRelative, delayMinutes, reminderSchedule, taskDate, taskSource);
     });
@@ -1976,6 +2014,34 @@ function initEventListeners() {
 
   // Carry Forward Banner
   document.getElementById("carry-all-forward-btn").addEventListener("click", carryAllForwardToToday);
+
+  // View Tabs Navigation Toggler
+  const tabDashboard = document.getElementById("tab-dashboard");
+  const tabInstructions = document.getElementById("tab-instructions");
+  const dashboardView = document.getElementById("dashboard-view");
+  const instructionsView = document.getElementById("instructions-view");
+  if (tabDashboard && tabInstructions && dashboardView && instructionsView) {
+    tabDashboard.addEventListener("click", () => {
+      tabDashboard.classList.add("active");
+      tabInstructions.classList.remove("active");
+      dashboardView.classList.remove("hidden");
+      instructionsView.classList.add("hidden");
+
+      // Restore desktop sidebar preference if active
+      if (AppState.preferences && AppState.preferences.sidebarCollapsed === false) {
+        document.body.classList.remove("sidebar-collapsed");
+      }
+    });
+    tabInstructions.addEventListener("click", () => {
+      tabInstructions.classList.add("active");
+      tabDashboard.classList.remove("active");
+      instructionsView.classList.remove("hidden");
+      dashboardView.classList.add("hidden");
+      renderInstructions();
+      toggleSidebar(false);
+      document.body.classList.add("sidebar-collapsed");
+    });
+  }
 
   // Profile dropdown toggler
   const profileBtn = document.getElementById("profile-dropdown-btn");
@@ -2217,6 +2283,58 @@ function initEventListeners() {
       existing.remove();
     }
   });
+
+  // Manage Pending Tasks Event Listeners
+  const managePendingBtn = document.getElementById("manage-pending-btn");
+  if (managePendingBtn) {
+    managePendingBtn.addEventListener("click", openPendingTasksModal);
+  }
+  const pendingCloseBtn = document.getElementById("pending-tasks-modal-close");
+  if (pendingCloseBtn) {
+    pendingCloseBtn.addEventListener("click", closePendingTasksModal);
+  }
+  const pendingCancelBtn = document.getElementById("pending-tasks-cancel");
+  if (pendingCancelBtn) {
+    pendingCancelBtn.addEventListener("click", closePendingTasksModal);
+  }
+  const selectAllCheckbox = document.getElementById("pending-select-all");
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener("change", (e) => {
+      const checked = e.target.checked;
+      const boxes = document.querySelectorAll(".pending-task-checkbox");
+      boxes.forEach(cb => cb.checked = checked);
+    });
+  }
+  const rescheduleSelectedBtn = document.getElementById("reschedule-selected-btn");
+  if (rescheduleSelectedBtn) {
+    rescheduleSelectedBtn.addEventListener("click", handleRescheduleSelected);
+  }
+
+  // Instructions Tab Event Listeners
+  const addInstBtn = document.getElementById("add-instruction-btn");
+  if (addInstBtn) {
+    addInstBtn.addEventListener("click", openAddInstructionModal);
+  }
+  const instCloseBtn = document.getElementById("instruction-modal-close");
+  if (instCloseBtn) {
+    instCloseBtn.addEventListener("click", closeInstructionModal);
+  }
+  const instCancelBtn = document.getElementById("instruction-modal-cancel");
+  if (instCancelBtn) {
+    instCancelBtn.addEventListener("click", closeInstructionModal);
+  }
+  const instForm = document.getElementById("instruction-modal-form");
+  if (instForm) {
+    instForm.addEventListener("submit", handleInstructionSubmit);
+  }
+  const deleteInstCancel = document.getElementById("delete-instruction-cancel-btn");
+  if (deleteInstCancel) {
+    deleteInstCancel.addEventListener("click", closeInstructionDeleteConfirm);
+  }
+  const deleteInstConfirm = document.getElementById("delete-instruction-confirm-btn");
+  if (deleteInstConfirm) {
+    deleteInstConfirm.addEventListener("click", handleInstructionDelete);
+  }
 }
 
 // --- Reschedule/Edit Single Task Modal handlers ---
@@ -2257,7 +2375,7 @@ function handleRescheduleSubmit(e) {
     const now = new Date();
     const todayStr = getLocalDateString(now);
     const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    
+
     // Reset notification fired state if the schedule/time is changed to the future
     if (title !== task.title || date !== task.date || time !== task.time || reminderSchedule !== task.reminderSchedule) {
       if (date > todayStr || (date === todayStr && time > currentTimeStr)) {
@@ -2361,5 +2479,274 @@ function registerServiceWorker() {
         }
       })
       .catch(err => console.warn('Service Worker registration failed:', err));
+  }
+}
+
+// --- Manage Pending Tasks Modal Handlers ---
+function openPendingTasksModal() {
+  const todayStr = getLocalDateString(new Date());
+  const overdueTasks = AppState.tasks.filter(t => t.date < todayStr && t.status !== "completed");
+  const listContainer = document.getElementById("pending-tasks-list");
+
+  if (!listContainer) return;
+  listContainer.innerHTML = "";
+
+  if (overdueTasks.length === 0) {
+    listContainer.innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">No pending tasks to display.</li>`;
+    document.getElementById("reschedule-selected-btn").disabled = true;
+  } else {
+    document.getElementById("reschedule-selected-btn").disabled = false;
+
+    // Sort oldest first
+    const sorted = [...overdueTasks].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+
+    sorted.forEach(t => {
+      const li = document.createElement("li");
+      li.className = "pending-task-item";
+      li.innerHTML = `
+        <div class="pending-task-item-left">
+          <input type="checkbox" class="pending-task-checkbox" data-id="${t.id}" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent-cyan);">
+          <div class="pending-task-label">
+            <span class="pending-task-title">${t.title}</span>
+            <span class="pending-task-orig-date">Original Date: ${t.date} at ${t.time}</span>
+          </div>
+        </div>
+      `;
+      // Allow clicking on the label to toggle checkbox
+      li.addEventListener("click", (e) => {
+        if (e.target.tagName !== "INPUT") {
+          const cb = li.querySelector(".pending-task-checkbox");
+          if (cb) cb.checked = !cb.checked;
+        }
+      });
+      listContainer.appendChild(li);
+    });
+  }
+
+  // Pre-fill target date to today's date
+  document.getElementById("pending-reschedule-date").value = todayStr;
+  document.getElementById("pending-select-all").checked = false;
+
+  document.getElementById("pending-tasks-modal-overlay").classList.remove("hidden");
+}
+
+function closePendingTasksModal() {
+  document.getElementById("pending-tasks-modal-overlay").classList.add("hidden");
+}
+
+function handleRescheduleSelected() {
+  const targetDate = document.getElementById("pending-reschedule-date").value;
+  if (!targetDate) {
+    alert("Please select a date to reschedule to.");
+    return;
+  }
+
+  const checkboxes = document.querySelectorAll(".pending-task-checkbox:checked");
+  const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute("data-id"));
+
+  if (selectedIds.length === 0) {
+    alert("Please select at least one task to reschedule.");
+    return;
+  }
+
+  if (db && currentUser) {
+    const batch = db.batch();
+    selectedIds.forEach(id => {
+      const ref = db.collection("users").doc(currentUser.uid).collection("tasks").doc(id);
+      batch.update(ref, { date: targetDate, carriedFrom: getLocalDateString(new Date()), notified: false });
+    });
+    batch.commit()
+      .then(() => {
+        closePendingTasksModal();
+        addAssistantMessage(`✅ Rescheduled ${selectedIds.length} task(s) to ${targetDate}.`);
+      })
+      .catch(err => console.error("Batch selective reschedule failed:", err));
+  } else {
+    selectedIds.forEach(id => {
+      const task = AppState.tasks.find(t => t.id === id);
+      if (task) {
+        task.carriedFrom = task.date;
+        task.date = targetDate;
+        task.notified = false;
+      }
+    });
+    saveState();
+    closePendingTasksModal();
+    refreshAllViews();
+    addAssistantMessage(`✅ Rescheduled ${selectedIds.length} task(s) to ${targetDate}.`);
+  }
+}
+
+// --- Important Instructions View Rendering & CRUD ---
+function renderInstructions() {
+  const grid = document.getElementById("instructions-grid");
+  if (!grid) return;
+
+  grid.innerHTML = "";
+
+  const list = AppState.instructions || [];
+  if (list.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1; padding: 40px; text-align: center; background: rgba(255, 255, 255, 0.01); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 12px;">
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#64748b" stroke-width="1.5" style="margin: 0 auto 15px;">
+          <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+        </svg>
+        <h4>No Instructions Recorded</h4>
+        <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 5px;">Click '+ Add Instruction' above to save rules, steps, or reference details.</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Sort instructions alphabetically by title
+  const sorted = [...list].sort((a, b) => a.title.localeCompare(b.title));
+
+  sorted.forEach(inst => {
+    const card = document.createElement("div");
+    card.className = "instruction-card";
+
+    // Category visual badge styling class mapping
+    let catClass = "category-general";
+    let catLabel = "General Info";
+    if (inst.category === "rules") {
+      catClass = "category-rules";
+      catLabel = "Rules & Guidelines";
+    } else if (inst.category === "steps") {
+      catClass = "category-steps";
+      catLabel = "Procedures / Steps";
+    }
+
+    card.innerHTML = `
+      <div class="instruction-card-header">
+        <h4 class="instruction-title">${inst.title}</h4>
+      </div>
+      <span class="instruction-category-badge ${catClass}">${catLabel}</span>
+      <div class="instruction-desc">${inst.description}</div>
+      <div class="task-actions">
+        <button class="task-action-btn" onclick="openInstructionEdit('${inst.id}')" title="Edit Instruction" style="padding: 6px; border-radius: 6px; min-width: 32px; min-height: 32px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+        </button>
+        <button class="task-action-btn btn-delete-task" onclick="openInstructionDeleteConfirm('${inst.id}')" title="Delete Instruction" style="padding: 6px; border-radius: 6px; min-width: 32px; min-height: 32px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
+      </div>
+    `;
+
+    grid.appendChild(card);
+  });
+}
+
+function openAddInstructionModal() {
+  document.getElementById("instruction-id").value = "";
+  document.getElementById("instruction-title").value = "";
+  document.getElementById("instruction-category").value = "general";
+  document.getElementById("instruction-desc").value = "";
+  document.getElementById("instruction-modal-title").textContent = "Add Important Instruction";
+  document.getElementById("instruction-modal-overlay").classList.remove("hidden");
+}
+
+function closeInstructionModal() {
+  document.getElementById("instruction-modal-overlay").classList.add("hidden");
+}
+
+function openInstructionEdit(id) {
+  const inst = AppState.instructions.find(i => i.id === id);
+  if (!inst) return;
+
+  document.getElementById("instruction-id").value = inst.id;
+  document.getElementById("instruction-title").value = inst.title;
+  document.getElementById("instruction-category").value = inst.category || "general";
+  document.getElementById("instruction-desc").value = inst.description;
+  document.getElementById("instruction-modal-title").textContent = "Edit Important Instruction";
+  document.getElementById("instruction-modal-overlay").classList.remove("hidden");
+}
+
+let activeDeletingInstructionId = null;
+
+function openInstructionDeleteConfirm(id) {
+  activeDeletingInstructionId = id;
+  document.getElementById("confirm-delete-instruction-modal").classList.remove("hidden");
+}
+
+function closeInstructionDeleteConfirm() {
+  activeDeletingInstructionId = null;
+  document.getElementById("confirm-delete-instruction-modal").classList.add("hidden");
+}
+
+function handleInstructionDelete() {
+  if (!activeDeletingInstructionId) return;
+  const id = activeDeletingInstructionId;
+  const inst = AppState.instructions.find(i => i.id === id);
+  const title = inst ? inst.title : "Unknown";
+
+  if (db && currentUser) {
+    db.collection("users").doc(currentUser.uid).collection("instructions").doc(id)
+      .update({
+        deleted: true,
+        deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+      })
+      .then(() => {
+        logUserActivity("delete_instruction", { title });
+        closeInstructionDeleteConfirm();
+        addAssistantMessage(`🗑️ Instruction deleted successfully.`);
+      })
+      .catch(err => console.error("Error deleting instruction:", err));
+  } else {
+    AppState.instructions = AppState.instructions.filter(i => i.id !== id);
+    saveState();
+    closeInstructionDeleteConfirm();
+    renderInstructions();
+    addAssistantMessage(`🗑️ Instruction deleted successfully.`);
+  }
+}
+
+function handleInstructionSubmit(e) {
+  e.preventDefault();
+  const idInput = document.getElementById("instruction-id").value;
+  const title = document.getElementById("instruction-title").value.trim();
+  const category = document.getElementById("instruction-category").value;
+  const description = document.getElementById("instruction-desc").value.trim();
+
+  if (!title || !description) return;
+
+  const isEdit = !!idInput;
+  const targetId = isEdit ? idInput : "inst-" + Date.now();
+
+  const instData = {
+    id: targetId,
+    title,
+    category,
+    description,
+    timestamp: Date.now()
+  };
+
+  if (db && currentUser) {
+    db.collection("users").doc(currentUser.uid).collection("instructions").doc(targetId)
+      .set(instData, { merge: true })
+      .then(() => {
+        logUserActivity(isEdit ? "edit_instruction" : "create_instruction", { title });
+        closeInstructionModal();
+        addAssistantMessage(isEdit ? `📝 Updated instruction: "**${title}**"` : `📥 Added important instruction: "**${title}**"`);
+      })
+      .catch(err => console.error("Error saving instruction to Firestore:", err));
+  } else {
+    if (isEdit) {
+      const idx = AppState.instructions.findIndex(i => i.id === targetId);
+      if (idx !== -1) {
+        AppState.instructions[idx] = instData;
+      }
+    } else {
+      AppState.instructions.push(instData);
+    }
+    saveState();
+    closeInstructionModal();
+    renderInstructions();
+    addAssistantMessage(isEdit ? `📝 Updated instruction: "${title}"` : `📥 Added important instruction: "${title}"`);
   }
 }
