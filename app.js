@@ -64,7 +64,10 @@ let AppState = {
     soundEnabled: true,
     notificationPermission: null,
     notificationsMuted: false,
-    aiName: "Kairos"
+    aiName: "Kairos",
+    pendingReminderEnabled: false,
+    pendingReminderTime: "09:00",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
   },
   currentCalendarMonth: new Date().getMonth(),
   currentCalendarYear: new Date().getFullYear(),
@@ -309,6 +312,8 @@ function initFirebaseAuth() {
         // Update UI
         const displayName = user.displayName || user.email.split("@")[0];
         nameLabel.textContent = displayName;
+        const profileBtn = document.getElementById("profile-dropdown-btn");
+        if (profileBtn) profileBtn.setAttribute("data-tooltip", displayName);
         dropName.textContent = displayName;
         dropEmail.textContent = user.email;
         AppState.preferences.username = displayName;
@@ -349,6 +354,8 @@ function initFirebaseAuth() {
 
         // Reset UI
         nameLabel.textContent = "Sign In";
+        const profileBtn = document.getElementById("profile-dropdown-btn");
+        if (profileBtn) profileBtn.setAttribute("data-tooltip", "Sign In");
         dropName.textContent = "Guest User";
         dropEmail.textContent = "Please sign in to sync";
 
@@ -563,7 +570,10 @@ async function initFcmMessaging(uid) {
     // Update the notification button in the UI
     const btn = document.getElementById("notification-toggle-btn");
     const btnText = document.getElementById("notification-btn-text");
-    if (btn) btn.className = "status-btn permission-granted";
+    if (btn) {
+      btn.className = "status-btn permission-granted";
+      btn.setAttribute("data-tooltip", "Mute Notifications");
+    }
     if (btnText) btnText.textContent = "Notifications Active";
 
     console.log("FCM token registered for push notifications.");
@@ -717,7 +727,8 @@ function requestNotificationPermission(silent = false) {
   const btnText = document.getElementById("notification-btn-text");
 
   if (!("Notification" in window)) {
-    btnText.textContent = "Not Supported";
+    if (btnText) btnText.textContent = "Not Supported";
+    if (btn) btn.setAttribute("data-tooltip", "Not Supported");
     return;
   }
 
@@ -727,8 +738,11 @@ function requestNotificationPermission(silent = false) {
       saveState();
 
       if (AppState.preferences.notificationsMuted) {
-        btn.className = "status-btn permission-denied";
-        btnText.textContent = "Notifications Muted";
+        if (btn) {
+          btn.className = "status-btn permission-denied";
+          btn.setAttribute("data-tooltip", "Activate Notifications");
+        }
+        if (btnText) btnText.textContent = "Notifications Muted";
         addAssistantMessage("🔕 Notifications muted. You will not receive task alerts on this browser.");
 
         // Clean FCM token from Firestore if online
@@ -744,8 +758,11 @@ function requestNotificationPermission(silent = false) {
             .catch(err => console.warn("Failed to remove FCM token on mute:", err));
         }
       } else {
-        btn.className = "status-btn permission-granted";
-        btnText.textContent = "Notifications Active";
+        if (btn) {
+          btn.className = "status-btn permission-granted";
+          btn.setAttribute("data-tooltip", "Mute Notifications");
+        }
+        if (btnText) btnText.textContent = "Notifications Active";
         addAssistantMessage("🔔 Notifications activated. You will receive task alerts.");
 
         // Re-register FCM token if online
@@ -756,37 +773,56 @@ function requestNotificationPermission(silent = false) {
     } else {
       // Load preference during boot
       if (AppState.preferences.notificationsMuted) {
-        btn.className = "status-btn permission-denied";
-        btnText.textContent = "Notifications Muted";
+        if (btn) {
+          btn.className = "status-btn permission-denied";
+          btn.setAttribute("data-tooltip", "Activate Notifications");
+        }
+        if (btnText) btnText.textContent = "Notifications Muted";
       } else {
-        btn.className = "status-btn permission-granted";
-        btnText.textContent = "Notifications Active";
+        if (btn) {
+          btn.className = "status-btn permission-granted";
+          btn.setAttribute("data-tooltip", "Mute Notifications");
+        }
+        if (btnText) btnText.textContent = "Notifications Active";
       }
     }
     AppState.preferences.notificationPermission = "granted";
     saveState();
   } else if (Notification.permission === "denied") {
-    btn.className = "status-btn permission-denied";
-    btnText.textContent = "Blocked";
+    if (btn) {
+      btn.className = "status-btn permission-denied";
+      btn.setAttribute("data-tooltip", "Notifications Blocked (Allow in Browser settings)");
+    }
+    if (btnText) btnText.textContent = "Blocked";
   } else {
     if (!silent) {
       Notification.requestPermission().then(permission => {
         if (permission === "granted") {
           AppState.preferences.notificationsMuted = false;
-          btn.className = "status-btn permission-granted";
-          btnText.textContent = "Notifications Active";
+          if (btn) {
+            btn.className = "status-btn permission-granted";
+            btn.setAttribute("data-tooltip", "Mute Notifications");
+          }
+          if (btnText) btnText.textContent = "Notifications Active";
           playNotificationChime();
           addAssistantMessage("🔔 Notifications activated. You will receive task alerts.");
           if (currentUser) {
             initFcmMessaging(currentUser.uid);
           }
         } else {
-          btn.className = "status-btn permission-denied";
-          btnText.textContent = "Blocked";
+          if (btn) {
+            btn.className = "status-btn permission-denied";
+            btn.setAttribute("data-tooltip", "Notifications Blocked (Allow in Browser settings)");
+          }
+          if (btnText) btnText.textContent = "Blocked";
         }
         AppState.preferences.notificationPermission = permission;
         saveState();
       });
+    } else {
+      if (btn) {
+        btn.setAttribute("data-tooltip", "Enable Notifications");
+      }
     }
   }
 }
@@ -1515,6 +1551,12 @@ function handleAddTaskSubmit(e) {
   const source = AppState.modalSource || "manual";
 
   if (title && date && time) {
+    const submitBtn = e.target.querySelector("button[type='submit']");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creating...";
+    }
+
     const randomSuffix = Math.random().toString(36).substring(2, 7);
     const newTask = {
       id: "task-" + Date.now() + "-" + randomSuffix,
@@ -1530,13 +1572,23 @@ function handleAddTaskSubmit(e) {
           closeAddTaskModal();
           addAssistantMessage(`📝 Scheduled: "**${title}**" on ${date} at ${time}.`);
         })
-        .catch(err => console.error("Add task failed:", err));
+        .catch(err => console.error("Add task failed:", err))
+        .finally(() => {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Create Task";
+          }
+        });
     } else {
       AppState.tasks.push(newTask);
       saveState();
       closeAddTaskModal();
       refreshAllViews();
       addAssistantMessage(`📝 Scheduled: "${title}" on ${date} at ${time}.`);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create Task";
+      }
     }
   }
 }
@@ -1563,9 +1615,29 @@ function updateAssistantNameUI() {
   }
   const fab = document.getElementById("mobile-chat-fab");
   if (fab) {
-    fab.setAttribute("title", `Open ${aiName} Assistant`);
+    fab.setAttribute("data-tooltip", `Open ${aiName} Assistant`);
   }
   renderChatHistory();
+}
+
+function updatePreferencesUI() {
+  updateAssistantNameUI();
+
+  const enabledCb = document.getElementById("pending-reminder-enabled");
+  const timeGroup = document.getElementById("pending-reminder-time-group");
+  const timeInput = document.getElementById("pending-reminder-time");
+
+  if (enabledCb && timeGroup && timeInput) {
+    const isEnabled = !!AppState.preferences.pendingReminderEnabled;
+    enabledCb.checked = isEnabled;
+    timeInput.value = AppState.preferences.pendingReminderTime || "09:00";
+
+    if (isEnabled) {
+      timeGroup.classList.remove("hidden");
+    } else {
+      timeGroup.classList.add("hidden");
+    }
+  }
 }
 
 function saveUserPreferences() {
@@ -1579,7 +1651,7 @@ function saveUserPreferences() {
       .catch(err => console.error("Merging preferences failed:", err));
   } else {
     saveState();
-    updateAssistantNameUI();
+    updatePreferencesUI();
   }
 }
 
@@ -1596,7 +1668,7 @@ function syncProfileFromFirestore(uid) {
         } else {
           AppState.preferences.aiName = AppState.preferences.aiName || "Kairos";
         }
-        updateAssistantNameUI();
+        updatePreferencesUI();
       }
     }, err => {
       console.error("Profile sync error:", err);
@@ -2335,6 +2407,36 @@ function initEventListeners() {
   if (deleteInstConfirm) {
     deleteInstConfirm.addEventListener("click", handleInstructionDelete);
   }
+
+  // Daily Pending Tasks Reminder Settings
+  const reminderCb = document.getElementById("pending-reminder-enabled");
+  if (reminderCb) {
+    reminderCb.addEventListener("change", (e) => {
+      const isEnabled = e.target.checked;
+      AppState.preferences.pendingReminderEnabled = isEnabled;
+      AppState.preferences.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      const timeGroup = document.getElementById("pending-reminder-time-group");
+      if (timeGroup) {
+        if (isEnabled) timeGroup.classList.remove("hidden");
+        else timeGroup.classList.add("hidden");
+      }
+      saveUserPreferences();
+    });
+  }
+
+  const saveReminderBtn = document.getElementById("save-pending-reminder-btn");
+  if (saveReminderBtn) {
+    saveReminderBtn.addEventListener("click", () => {
+      const timeVal = document.getElementById("pending-reminder-time").value;
+      if (timeVal) {
+        AppState.preferences.pendingReminderTime = timeVal;
+        AppState.preferences.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        saveUserPreferences();
+        addAssistantMessage(`⏰ Daily reminder for pending tasks scheduled for **${timeVal}**.`);
+      }
+    });
+  }
 }
 
 // --- Reschedule/Edit Single Task Modal handlers ---
@@ -2371,6 +2473,12 @@ function handleRescheduleSubmit(e) {
 
   const task = AppState.tasks.find(t => t.id === taskId);
   if (task && title && date && time) {
+    const submitBtn = e.target.querySelector("button[type='submit']");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Saving...";
+    }
+
     let nextNotified = task.notified;
     const now = new Date();
     const todayStr = getLocalDateString(now);
@@ -2401,13 +2509,23 @@ function handleRescheduleSubmit(e) {
           closeRescheduleModal();
           addAssistantMessage(`🔄 Updated Task: "**${title}**" (${priority}, scheduled ${date} at ${time}).`);
         })
-        .catch(err => console.error("Update task failed:", err));
+        .catch(err => console.error("Update task failed:", err))
+        .finally(() => {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Save Changes";
+          }
+        });
     } else {
       Object.assign(task, updates);
       saveState();
       closeRescheduleModal();
       refreshAllViews();
       addAssistantMessage(`🔄 Updated Task: "${title}" (${priority}, scheduled ${date} at ${time}).`);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Save Changes";
+      }
     }
   }
 }

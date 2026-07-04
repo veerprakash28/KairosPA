@@ -128,21 +128,22 @@
             <div class="clock-time" id="clock-time">00:00:00</div>
             <div class="clock-date" id="clock-date">Sunday, June 21, 2026</div>
           </div>
-          <button id="notification-toggle-btn" class="status-btn permission-denied">
+          <button id="notification-toggle-btn" class="status-btn permission-denied" data-tooltip="Enable Notifications">
             <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
             </svg>
-            <span id="notification-btn-text">Enable Notifications</span>
+            <span id="notification-btn-text" class="hidden">Enable Notifications</span>
           </button>
 
           <!-- User Profile Dropdown Menu -->
           <div class="user-profile-menu" id="user-profile-menu">
-            <button id="profile-dropdown-btn" class="profile-btn">
-              <span id="profile-name-label">Sign In</span>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 4px;">
-                <path d="M6 9l6 6 6-6"></path>
+            <button id="profile-dropdown-btn" class="profile-btn" data-tooltip="Sign In">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="profile-icon">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
               </svg>
+              <span id="profile-name-label" class="hidden">Sign In</span>
             </button>
             <div class="profile-dropdown hidden" id="profile-dropdown">
               <div class="dropdown-user-info" id="dropdown-user-info-section">
@@ -153,9 +154,24 @@
               <!-- Settings Section (Signed-in only) -->
               <div id="dropdown-settings-section" class="hidden" style="padding: 0 0 12px 0;">
                 <label for="ai-name-setting" style="display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 6px; font-weight: 600;">Assistant Name</label>
-                <div style="display: flex; gap: 8px; align-items: center;">
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
                   <input type="text" id="ai-name-setting" value="Kairos" style="flex: 1; padding: 6px 10px; font-size: 0.8rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2); color: #fff; font-family: inherit; outline: none; width: 100%;" />
                   <button id="save-ai-name-btn" class="glow-button-primary" style="padding: 6px 12px; font-size: 0.75rem; margin: 0; min-height: unset; line-height: 1; border-radius: 6px; cursor: pointer;">Save</button>
+                </div>
+                
+                <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 10px 0;">
+                
+                <label style="display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 6px; font-weight: 600;">Pending Tasks Reminder</label>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #fff; cursor: pointer; user-select: none;">
+                    <input type="checkbox" id="pending-reminder-enabled" style="width: 14px; height: 14px; accent-color: var(--accent-cyan);" />
+                    Send Daily Reminder
+                  </label>
+                  <div id="pending-reminder-time-group" class="hidden" style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                    <span style="font-size: 0.75rem; color: #94a3b8;">At:</span>
+                    <input type="time" id="pending-reminder-time" value="09:00" style="padding: 4px 8px; font-size: 0.8rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2); color: #fff; font-family: inherit; outline: none; width: auto;" />
+                    <button id="save-pending-reminder-btn" class="glow-button-primary" style="padding: 6px 12px; font-size: 0.75rem; margin: 0; min-height: unset; line-height: 1; border-radius: 6px; cursor: pointer;">Save</button>
+                  </div>
                 </div>
               </div>
               <hr id="settings-divider" class="dropdown-divider hidden">

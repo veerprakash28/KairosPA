@@ -558,15 +558,13 @@ body.sidebar-collapsed .desktop-sidebar-toggle-btn {
 .status-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
   border-radius: var(--border-radius-md);
-  font-family: var(--font-main);
-  font-size: 0.85rem;
-  font-weight: 600;
   cursor: pointer;
   transition: var(--transition-smooth);
-  white-space: nowrap;
 }
 
 .status-btn .btn-icon {
@@ -588,7 +586,7 @@ body.sidebar-collapsed .desktop-sidebar-toggle-btn {
   background: rgba(0, 243, 255, 0.08);
   border: 1px solid rgba(0, 243, 255, 0.3);
   color: var(--accent-cyan);
-  cursor: default;
+  cursor: pointer;
 }
 
 /* Metrics Row Grid */
@@ -1633,17 +1631,15 @@ body.sidebar-collapsed .desktop-sidebar-toggle-btn {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #fff;
-  font-family: var(--font-main);
-  font-weight: 600;
-  font-size: 0.85rem;
-  padding: 10px 16px;
-  border-radius: var(--border-radius-md);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: var(--border-radius-md);
   transition: var(--transition-smooth);
-  white-space: nowrap;
 }
 
 .profile-btn:hover {
@@ -3235,6 +3231,37 @@ body.sidebar-open {
   box-shadow: 0 0 8px var(--accent-cyan);
 }
 
+/* Super highlighted blood red background for Important Instructions tab (solid, not glass) */
+#tab-instructions {
+  color: #ffffff;
+  background: #8b0000 !important;
+  border: 1px solid #730000 !important;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(139, 0, 0, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  backdrop-filter: none !important;
+}
+
+#tab-instructions:hover {
+  color: #ffffff;
+  background: #a30000 !important;
+  border-color: #8b0000 !important;
+  box-shadow: 0 4px 16px rgba(163, 0, 0, 0.6);
+}
+
+#tab-instructions.active {
+  color: #ffffff;
+  background: #b30000 !important;
+  border-color: #990000 !important;
+  box-shadow: 0 4px 20px rgba(179, 0, 0, 0.8), inset 0 0 8px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+}
+
+#tab-instructions.active::after {
+  background: #ff3333;
+  box-shadow: 0 0 8px #ff3333, 0 0 15px #ff0000;
+}
+
 /* ==========================================================================
    INSTRUCTIONS VIEW
    ========================================================================== */
@@ -3397,6 +3424,62 @@ body.sidebar-open {
 .pending-task-orig-date {
   font-size: 0.75rem;
   color: #94a3b8;
+}
+
+/* ==========================================================================
+   CUSTOM FLOATING TOOLTIPS (GLASSMORPHIC)
+   ========================================================================== */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translate(-50%, 4px) scale(0.95);
+  background: rgba(13, 13, 23, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.15s;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 10000;
+  font-family: var(--font-main);
+  letter-spacing: 0.2px;
+}
+
+[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translate(-50%, 4px) scale(0.95);
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: rgba(13, 13, 23, 0.9) transparent transparent transparent;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.15s;
+  z-index: 10000;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0) scale(1);
 }
 
 
