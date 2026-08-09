@@ -185,7 +185,82 @@ exports.checkScheduledTasks = functions.pubsub
         }
       });
 
-      await Promise.all([...standardPromises, ...leadingPromises]);
+      // 3. Daily Pending Tasks Reminder query
+      const usersSnapshot = await db.collection("users").get();
+      const reminderPromises = [];
+
+      if (!usersSnapshot.empty) {
+        usersSnapshot.forEach(userDoc => {
+          const userData = userDoc.data();
+          const preferences = userData.preferences || {};
+
+          if (preferences.pendingReminderEnabled && preferences.pendingReminderTime) {
+            const uid = userDoc.id;
+            const userTimezone = preferences.timezone || "UTC";
+            const reminderTime = preferences.pendingReminderTime; // e.g. "09:00"
+
+            try {
+              const timeFormatter = new Intl.DateTimeFormat("en-US", {
+                timeZone: userTimezone,
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false
+              });
+              const timeParts = timeFormatter.formatToParts(new Date());
+              const hour = timeParts.find(p => p.type === "hour").value;
+              const minute = timeParts.find(p => p.type === "minute").value;
+              const userLocalTimeStr = `${hour}:${minute}`;
+
+              const dateFormatter = new Intl.DateTimeFormat("en-US", {
+                timeZone: userTimezone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+              });
+              const dateParts = dateFormatter.formatToParts(new Date());
+              const yyyy = dateParts.find(p => p.type === "year").value;
+              const mm = dateParts.find(p => p.type === "month").value;
+              const dd = dateParts.find(p => p.type === "day").value;
+              const userLocalDateStr = `${yyyy}-${mm}-${dd}`;
+
+              if (userLocalTimeStr === reminderTime) {
+                if (userData.lastPendingReminderFiredDate !== userLocalDateStr) {
+                  reminderPromises.push((async () => {
+                    try {
+                      const overdueTasksSnapshot = await db.collection("users").doc(uid).collection("tasks")
+                        .where("status", "in", ["pending", "not-started", "in-progress"])
+                        .where("date", "<", userLocalDateStr)
+                        .get();
+
+                      const pendingCount = overdueTasksSnapshot.empty ? 0 : overdueTasksSnapshot.docs.filter(d => {
+                        const taskData = d.data();
+                        return !taskData.deleted && taskData.status !== "completed";
+                      }).length;
+
+                      if (pendingCount > 0) {
+                        await sendFCMNotification(
+                          uid,
+                          "⏰ Pending Tasks Reminder",
+                          `You have ${pendingCount} pending task(s) that need to be rescheduled or completed!`,
+                          "pending-tasks-reschedule"
+                        );
+                        await userDoc.ref.update({ lastPendingReminderFiredDate: userLocalDateStr });
+                        console.log(`Pending tasks reminder sent to user ${uid} (${pendingCount} tasks).`);
+                      }
+                    } catch (taskErr) {
+                      console.error(`Error querying overdue tasks for user ${uid}:`, taskErr);
+                    }
+                  })());
+                }
+              }
+            } catch (tzErr) {
+              console.error(`Timezone or date parsing error for user ${uid} with timezone ${userTimezone}:`, tzErr);
+            }
+          }
+        });
+      }
+
+      await Promise.all([...standardPromises, ...leadingPromises, ...reminderPromises]);
       console.log("checkScheduledTasks complete.");
       return null;
     } catch (err) {

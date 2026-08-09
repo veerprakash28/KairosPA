@@ -329,6 +329,7 @@ function initFirebaseAuth() {
         saveUserProfile(user);
 
         // Start Firestore real-time sync
+        migrateDeletedField(user.uid);
         syncTasksFromFirestore(user.uid);
         syncChatFromFirestore(user.uid);
         syncProfileFromFirestore(user.uid);
@@ -455,13 +456,11 @@ function syncTasksFromFirestore(uid) {
   }
 
   userTasksUnsubscribe = db.collection("users").doc(uid).collection("tasks")
+    .where("deleted", "==", false)
     .onSnapshot(snapshot => {
       let tasksList = [];
       snapshot.forEach(doc => {
-        const data = doc.data();
-        if (!data.deleted) {
-          tasksList.push(data);
-        }
+        tasksList.push(doc.data());
       });
       AppState.tasks = tasksList;
 
@@ -483,12 +482,14 @@ function syncChatFromFirestore(uid) {
   }
 
   userChatUnsubscribe = db.collection("users").doc(uid).collection("chatHistory")
-    .orderBy("timestamp", "asc")
+    .orderBy("timestamp", "desc")
+    .limit(50)
     .onSnapshot(snapshot => {
       let history = [];
       snapshot.forEach(doc => {
         history.push(doc.data());
       });
+      history.reverse();
       AppState.chatHistory = history;
       renderChatHistory();
     }, err => {
@@ -503,19 +504,53 @@ function syncInstructionsFromFirestore(uid) {
   }
 
   userInstructionsUnsubscribe = db.collection("users").doc(uid).collection("instructions")
+    .where("deleted", "==", false)
     .onSnapshot(snapshot => {
       let instList = [];
       snapshot.forEach(doc => {
-        const data = doc.data();
-        if (!data.deleted) {
-          instList.push(data);
-        }
+        instList.push(doc.data());
       });
       AppState.instructions = instList;
       renderInstructions();
     }, err => {
       console.error("Firestore instructions sync error:", err);
     });
+}
+
+// --- One-Time Database Migration to set deleted: false ---
+function migrateDeletedField(uid) {
+  if (AppState.migratedDeleted) return;
+  AppState.migratedDeleted = true;
+
+  db.collection("users").doc(uid).collection("tasks").get().then(snapshot => {
+    const batch = db.batch();
+    let count = 0;
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.deleted === undefined) {
+        batch.update(doc.ref, { deleted: false });
+        count++;
+      }
+    });
+    if (count > 0) {
+      batch.commit().then(() => console.log(`Migrated ${count} tasks to deleted: false`));
+    }
+  }).catch(err => console.error("Task migration error:", err));
+
+  db.collection("users").doc(uid).collection("instructions").get().then(snapshot => {
+    const batch = db.batch();
+    let count = 0;
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.deleted === undefined) {
+        batch.update(doc.ref, { deleted: false });
+        count++;
+      }
+    });
+    if (count > 0) {
+      batch.commit().then(() => console.log(`Migrated ${count} instructions to deleted: false`));
+    }
+  }).catch(err => console.error("Instruction migration error:", err));
 }
 
 function drawMessageInLog(msg) {
@@ -606,7 +641,8 @@ function getTaskTimestamp(dateStr, timeStr) {
 function firestoreSaveTask(task) {
   if (db && currentUser) {
     logUserActivity("create_task", { taskId: task.id, title: task.title, date: task.date, time: task.time });
-    return db.collection("users").doc(currentUser.uid).collection("tasks").doc(task.id).set(task);
+    const taskWithDeleteField = { ...task, deleted: task.deleted !== undefined ? task.deleted : false };
+    return db.collection("users").doc(currentUser.uid).collection("tasks").doc(task.id).set(taskWithDeleteField);
   }
   return Promise.resolve();
 }
@@ -1563,6 +1599,7 @@ function handleAddTaskSubmit(e) {
       title, date, time, priority, repeat, status, reminderSchedule,
       source: source,
       notified: false,
+      deleted: false,
       dueTimestamp: getTaskTimestamp(date, time)
     };
 
@@ -2841,6 +2878,7 @@ function handleInstructionSubmit(e) {
     title,
     category,
     description,
+    deleted: false,
     timestamp: Date.now()
   };
 
