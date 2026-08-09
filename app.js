@@ -216,7 +216,7 @@ function initFirebaseAuth() {
       .then((result) => {
         const user = result.user;
         const displayName = user.displayName || user.email.split("@")[0];
-        addAssistantMessage(`🎉 Welcome, **${displayName}**! Signed in with Google.`);
+        addSessionMessage(`🎉 Welcome, **${displayName}**! Signed in with Google.`);
         logUserActivity("login", { method: "google" });
       })
       .catch((err) => {
@@ -346,7 +346,7 @@ function initFirebaseAuth() {
         if (settingsDivider) settingsDivider.classList.remove("hidden");
 
         if (isManualLogin) {
-          addAssistantMessage(`🔒 Synced! Welcome back, **${displayName}**.`);
+          addSessionMessage(`🔒 Synced! Welcome back, **${displayName}**.`);
           isManualLogin = false;
         } else {
           logUserActivity("session_restore", { userAgent: navigator.userAgent });
@@ -363,6 +363,7 @@ function initFirebaseAuth() {
 
         // Reset user state to local guest mode
         AppState.preferences.username = "User";
+        AppState.sessionMessages = [];
         loadState(); // Restore local guest tasks and chat logs
 
         // Show sign in, hide sign out
@@ -1786,6 +1787,11 @@ function renderChatHistory() {
   } else {
     history.forEach(msg => drawMessageInLog(msg));
   }
+
+  // Render temporary session logs
+  if (AppState.sessionMessages) {
+    AppState.sessionMessages.forEach(msg => drawMessageInLog(msg));
+  }
 }
 
 function addAssistantMessage(text, className = "") {
@@ -1802,6 +1808,22 @@ function addAssistantMessage(text, className = "") {
     saveState();
     drawMessageInLog(msgObj);
   }
+}
+
+function addSessionMessage(text, sender = "assistant") {
+  if (!AppState.sessionMessages) {
+    AppState.sessionMessages = [];
+  }
+  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const msgObj = {
+    id: "session-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7),
+    sender: sender,
+    text: text,
+    time: timeStr,
+    timestamp: Date.now()
+  };
+  AppState.sessionMessages.push(msgObj);
+  drawMessageInLog(msgObj);
 }
 
 function addUserMessage(text) {
