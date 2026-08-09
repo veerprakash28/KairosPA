@@ -685,10 +685,17 @@ function initClock() {
   function tick() {
     const now = new Date();
 
-    clockTime.textContent = now.toLocaleTimeString([], { hour12: false });
-    clockDate.textContent = now.toLocaleDateString([], {
+    const timeStr = now.toLocaleTimeString([], { hour12: false });
+    if (clockTime && clockTime.textContent !== timeStr) {
+      clockTime.textContent = timeStr;
+    }
+
+    const dateStr = now.toLocaleDateString([], {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
+    if (clockDate && clockDate.textContent !== dateStr) {
+      clockDate.textContent = dateStr;
+    }
 
     const hour = now.getHours();
     let greeting = "Good Night";
@@ -696,7 +703,11 @@ function initClock() {
     else if (hour >= 12 && hour < 17) greeting = "Good Afternoon";
     else if (hour >= 17 && hour < 22) greeting = "Good Evening";
 
-    greetingText.textContent = `${greeting}, ${AppState.preferences.username}`;
+    const greetingStr = `${greeting}, ${AppState.preferences.username || "User"}`;
+    if (greetingText && greetingText.textContent !== greetingStr) {
+      greetingText.textContent = greetingStr;
+    }
+
     checkSchedulerAlerts(now);
 
     // Nag/loop alert warning every 5 minutes if there is an active unanswered alert
@@ -863,7 +874,13 @@ function requestNotificationPermission(silent = false) {
 }
 
 // --- Scheduler: Compare tasks with clock and trigger alerts ---
+let lastCheckedMinute = null;
+
 function checkSchedulerAlerts(now) {
+  const currentMinute = `${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
+  if (lastCheckedMinute === currentMinute) return;
+  lastCheckedMinute = currentMinute;
+
   const todayStr = getLocalDateString(now);
   const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
