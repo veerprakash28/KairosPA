@@ -3482,5 +3482,271 @@ body.sidebar-open {
   transform: translate(-50%, 0) scale(1);
 }
 
+/* ==========================================================================
+   VOICE RECORDING BUTTON (SPEECH DICTATION)
+   ========================================================================== */
+.voice-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: var(--transition-smooth);
+  margin-right: 6px;
+  position: relative;
+}
+
+.voice-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.voice-btn.listening {
+  color: var(--accent-pink);
+  background: rgba(255, 0, 110, 0.15);
+  animation: voicePulse 1.5s infinite alternate ease-in-out;
+  box-shadow: 0 0 10px rgba(255, 0, 110, 0.4);
+}
+
+@keyframes voicePulse {
+  0% { transform: scale(1); box-shadow: 0 0 6px rgba(255, 0, 110, 0.3); }
+  100% { transform: scale(1.1); box-shadow: 0 0 14px rgba(255, 0, 110, 0.6); }
+}
+
+/* ==========================================================================
+   PRODUCTIVITY ANALYTICS & STREAKS CARD
+   ========================================================================== */
+.analytics-section {
+  margin-top: 24px;
+  margin-bottom: 24px;
+  padding: 20px;
+}
+
+.analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.analytics-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+
+.streak-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94a3b8;
+  transition: var(--transition-smooth);
+}
+
+.streak-badge.active-streak {
+  background: rgba(255, 153, 0, 0.08);
+  border-color: rgba(255, 153, 0, 0.3);
+  color: #ff9900;
+  box-shadow: 0 0 12px rgba(255, 153, 0, 0.15);
+  text-shadow: 0 0 8px rgba(255, 153, 0, 0.2);
+}
+
+.streak-badge.active-streak .fire-icon {
+  animation: fireWave 1.2s infinite alternate ease-in-out;
+  display: inline-block;
+}
+
+@keyframes fireWave {
+  0% { transform: scale(1) rotate(-5deg); }
+  100% { transform: scale(1.2) rotate(5deg); filter: drop-shadow(0 0 4px #ff9900); }
+}
+
+.analytics-body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 24px;
+}
+
+.chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chart-subtitle {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.chart-wrapper {
+  background: rgba(0,0,0,0.15);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  padding: 10px;
+  display: flex;
+  align-items: flex-end;
+  height: 150px;
+}
+
+.streak-details {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.progress-ring-box {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.progress-ring {
+  transform: rotate(-90deg);
+}
+
+.progress-ring-circle {
+  stroke-dasharray: 201 201;
+  stroke-dashoffset: 201;
+  transition: stroke-dashoffset 0.4s ease-out;
+  stroke-linecap: round;
+}
+
+.progress-ring-text {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.progress-ring-text span {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.progress-ring-text small {
+  font-size: 0.55rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.streak-records {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.record-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.record-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.record-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   PWA INSTALLATION PROMPT CARD
+   ========================================================================== */
+.pwa-install-banner {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--border-radius-md);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 12px 8px 12px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position: relative;
+  transition: var(--transition-smooth);
+}
+
+.pwa-content {
+  display: flex;
+  align-items: center;
+  font-size: 0.78rem;
+  color: #fff;
+  font-weight: 500;
+  flex: 1;
+  padding-right: 8px;
+}
+
+.pwa-content svg {
+  color: var(--accent-cyan);
+  margin-right: 8px;
+}
+
+.pwa-install-banner .small-btn {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  margin: 0 10px 0 0;
+  cursor: pointer;
+}
+
+.pwa-close-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  transition: var(--transition-smooth);
+}
+
+.pwa-close-btn:hover {
+  color: #fff;
+}
+
+/* Responsive Analytics rules */
+@media (max-width: 900px) {
+  .analytics-body {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
 
 

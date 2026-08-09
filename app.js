@@ -109,6 +109,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initClock();
   initCalendar();
   initEventListeners();
+  initPwaInstaller();
   requestNotificationPermission(true); // check status silently
   renderChatHistory();
 
@@ -470,6 +471,7 @@ function syncTasksFromFirestore(uid) {
       renderSelectedDayPreview();
       updateMetrics();
       checkOverduePreviousDays();
+      calculateAndRenderStreaks();
     }, err => {
       console.error("Firestore sync error:", err);
     });
@@ -1074,6 +1076,7 @@ function refreshAllViews() {
   renderCalendar();
   renderSelectedDayPreview();
   updateMetrics();
+  calculateAndRenderStreaks();
 }
 
 // --- UI Board & Timeline Renderers ---
@@ -2121,6 +2124,12 @@ function initEventListeners() {
   // PA Command box
   document.getElementById("pa-command-form").addEventListener("submit", handleAssistantCommand);
 
+  // PA Command voice input
+  const voiceBtn = document.getElementById("pa-voice-btn");
+  if (voiceBtn) {
+    voiceBtn.addEventListener("click", toggleVoiceDictation);
+  }
+
   // Carry Forward Banner
   document.getElementById("carry-all-forward-btn").addEventListener("click", carryAllForwardToToday);
 
@@ -2905,4 +2914,281 @@ function handleInstructionSubmit(e) {
     renderInstructions();
     addAssistantMessage(isEdit ? `📝 Updated instruction: "${title}"` : `📥 Added important instruction: "${title}"`);
   }
+}
+
+// --- Speech Recognition Dictation Engine ---
+let voiceRecognition = null;
+let isListening = false;
+
+function initVoiceRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    console.warn("Speech Recognition not supported in this browser.");
+    return null;
+  }
+
+  const rec = new SpeechRecognition();
+  rec.continuous = false;
+  rec.interimResults = false;
+  rec.lang = 'en-US';
+
+  rec.onstart = () => {
+    isListening = true;
+    const voiceBtn = document.getElementById("pa-voice-btn");
+    if (voiceBtn) {
+      voiceBtn.classList.add("listening");
+      voiceBtn.setAttribute("data-tooltip", "Listening... Speak now");
+    }
+  };
+
+  rec.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    const input = document.getElementById("pa-command-input");
+    if (input) {
+      input.value = transcript;
+    }
+  };
+
+  rec.onerror = (e) => {
+    console.error("Speech Recognition error:", e);
+    stopVoiceDictation();
+  };
+
+  rec.onend = () => {
+    stopVoiceDictation();
+  };
+
+  return rec;
+}
+
+function toggleVoiceDictation() {
+  if (!voiceRecognition) {
+    voiceRecognition = initVoiceRecognition();
+  }
+
+  if (!voiceRecognition) {
+    addAssistantMessage("⚠️ Speech recognition is not supported in this browser. Please try Google Chrome or Safari.");
+    return;
+  }
+
+  if (isListening) {
+    voiceRecognition.stop();
+  } else {
+    try {
+      voiceRecognition.start();
+    } catch (err) {
+      console.warn("Failed to start voice dictation:", err);
+    }
+  }
+}
+
+function stopVoiceDictation() {
+  isListening = false;
+  const voiceBtn = document.getElementById("pa-voice-btn");
+  if (voiceBtn) {
+    voiceBtn.classList.remove("listening");
+    voiceBtn.setAttribute("data-tooltip", "Dictate Command");
+  }
+}
+
+// --- Productivity Analytics & Streak Calculations ---
+function calculateAndRenderStreaks() {
+  const tasks = AppState.tasks || [];
+  const completedTasks = tasks.filter(t => t.status === "completed" && !t.deleted);
+
+  // Group unique completed dates
+  const completedDates = new Set(completedTasks.map(t => t.date));
+
+  const todayStr = getLocalDateString(new Date());
+  
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = getLocalDateString(yesterday);
+
+  let currentStreak = 0;
+  const hasCompletedToday = completedDates.has(todayStr);
+  const hasCompletedYesterday = completedDates.has(yesterdayStr);
+
+  if (hasCompletedToday || hasCompletedYesterday) {
+    let dateToProcess = hasCompletedToday ? new Date() : yesterday;
+    
+    while (true) {
+      const checkStr = getLocalDateString(dateToProcess);
+      if (completedDates.has(checkStr)) {
+        currentStreak++;
+        dateToProcess.setDate(dateToProcess.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+  }
+
+  AppState.preferences = AppState.preferences || {};
+  AppState.preferences.currentStreak = currentStreak;
+
+  const longestStreak = AppState.preferences.longestStreak || 0;
+  if (currentStreak > longestStreak) {
+    AppState.preferences.longestStreak = currentStreak;
+    saveUserPreferences();
+  }
+
+  const streakText = document.getElementById("streak-count-text");
+  const longestText = document.getElementById("longest-streak-count");
+  const todayCompletedVal = document.getElementById("today-completed-count");
+  const todayProgressRing = document.getElementById("today-progress-ring");
+  const todayProgressPercent = document.getElementById("today-progress-percent");
+  const streakBadge = document.getElementById("streak-badge-container");
+
+  if (streakText) {
+    streakText.textContent = `${currentStreak} Day${currentStreak !== 1 ? 's' : ''} Streak`;
+  }
+  if (longestText) {
+    longestText.textContent = `${AppState.preferences.longestStreak || 0} Day${AppState.preferences.longestStreak !== 1 ? 's' : ''}`;
+  }
+
+  if (streakBadge) {
+    if (currentStreak > 0) {
+      streakBadge.classList.add("active-streak");
+    } else {
+      streakBadge.classList.remove("active-streak");
+    }
+  }
+
+  const todayTotalTasks = tasks.filter(t => t.date === todayStr && !t.deleted);
+  const todayCompletedTasks = todayTotalTasks.filter(t => t.status === "completed");
+  const todayCompletedCount = todayCompletedTasks.length;
+  const targetCount = 4;
+  
+  if (todayCompletedVal) {
+    todayCompletedVal.textContent = `${todayCompletedCount} / ${targetCount}`;
+  }
+
+  const completionRatio = Math.min(todayCompletedCount / targetCount, 1);
+  const percent = Math.round(completionRatio * 100);
+  
+  if (todayProgressPercent) {
+    todayProgressPercent.textContent = `${percent}%`;
+  }
+
+  if (todayProgressRing) {
+    const radius = 32;
+    const circumference = 2 * Math.PI * radius;
+    todayProgressRing.style.strokeDasharray = `${circumference} ${circumference}`;
+    const offset = circumference - (completionRatio * circumference);
+    todayProgressRing.style.strokeDashoffset = offset;
+  }
+
+  renderWeeklyChart(tasks);
+}
+
+function renderWeeklyChart(tasks) {
+  const chartSvg = document.getElementById("weekly-activity-chart");
+  if (!chartSvg) return;
+  chartSvg.innerHTML = "";
+
+  const chartHeight = 150;
+  const bottomMargin = 25;
+  const topMargin = 20;
+  const barMaxHeight = chartHeight - topMargin - bottomMargin;
+
+  const last7Days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    last7Days.push({
+      dateStr: getLocalDateString(d),
+      dayName: d.toLocaleDateString("en-US", { weekday: 'short' }),
+      count: 0
+    });
+  }
+
+  last7Days.forEach(day => {
+    day.count = tasks.filter(t => t.date === day.dateStr && t.status === "completed" && !t.deleted).length;
+  });
+
+  const maxTasksCompleted = Math.max(...last7Days.map(d => d.count), 1);
+  const svgWidth = chartSvg.clientWidth || 320;
+  const barWidth = 24;
+  const gap = (svgWidth - (7 * barWidth)) / 8;
+
+  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+  defs.innerHTML = `
+    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--accent-cyan)" />
+      <stop offset="100%" stop-color="rgba(0, 243, 255, 0.2)" />
+    </linearGradient>
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  `;
+  chartSvg.appendChild(defs);
+
+  last7Days.forEach((day, index) => {
+    const x = gap + index * (barWidth + gap);
+    const ratio = day.count / maxTasksCompleted;
+    const barHeight = Math.max(ratio * barMaxHeight, 4);
+    const y = chartHeight - bottomMargin - barHeight;
+
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", x);
+    rect.setAttribute("y", y);
+    rect.setAttribute("width", barWidth);
+    rect.setAttribute("height", barHeight);
+    rect.setAttribute("rx", 6);
+    rect.setAttribute("fill", "url(#barGradient)");
+    rect.setAttribute("filter", "url(#neonGlow)");
+    chartSvg.appendChild(rect);
+
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", x + barWidth / 2);
+    text.setAttribute("y", chartHeight - 6);
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("fill", "#94a3b8");
+    text.setAttribute("font-size", "10px");
+    text.textContent = day.dayName;
+    chartSvg.appendChild(text);
+
+    if (day.count > 0) {
+      const valText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      valText.setAttribute("x", x + barWidth / 2);
+      valText.setAttribute("y", y - 6);
+      valText.setAttribute("text-anchor", "middle");
+      valText.setAttribute("fill", "#fff");
+      valText.setAttribute("font-size", "9px");
+      valText.setAttribute("font-weight", "600");
+      valText.textContent = day.count;
+      chartSvg.appendChild(valText);
+    }
+  });
+}
+
+// --- Progressive Web App Installer (PWA) ---
+let deferredPrompt = null;
+
+function initPwaInstaller() {
+  const banner = document.getElementById("pwa-install-banner");
+  const installBtn = document.getElementById("pwa-install-btn");
+  const dismissBtn = document.getElementById("pwa-dismiss-btn");
+
+  if (!banner || !installBtn || !dismissBtn) return;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    banner.classList.remove("hidden");
+  });
+
+  installBtn.addEventListener('click', () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      deferredPrompt = null;
+      banner.classList.add("hidden");
+    });
+  });
+
+  dismissBtn.addEventListener('click', () => {
+    banner.classList.add("hidden");
+  });
 }
