@@ -3817,3 +3817,14 @@ body.sidebar-open {
   color: #94a3b8;
   line-height: 1.35;
 }
+
+/* Custom full-width glass analytics card */
+.analytics-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--border-radius-lg);
+  padding: 24px;
+  width: 100%;
+}
