@@ -2135,31 +2135,49 @@ function initEventListeners() {
 
   // View Tabs Navigation Toggler
   const tabDashboard = document.getElementById("tab-dashboard");
+  const tabProductivity = document.getElementById("tab-productivity");
   const tabInstructions = document.getElementById("tab-instructions");
   const dashboardView = document.getElementById("dashboard-view");
+  const productivityView = document.getElementById("productivity-view");
   const instructionsView = document.getElementById("instructions-view");
-  if (tabDashboard && tabInstructions && dashboardView && instructionsView) {
-    tabDashboard.addEventListener("click", () => {
-      tabDashboard.classList.add("active");
-      tabInstructions.classList.remove("active");
-      dashboardView.classList.remove("hidden");
-      instructionsView.classList.add("hidden");
 
-      // Restore desktop sidebar preference if active
+  function switchTab(activeTabId) {
+    const tabs = [
+      { btn: tabDashboard, view: dashboardView },
+      { btn: tabProductivity, view: productivityView },
+      { btn: tabInstructions, view: instructionsView }
+    ];
+
+    tabs.forEach(tab => {
+      if (!tab.btn || !tab.view) return;
+      if (tab.btn.id === activeTabId) {
+        tab.btn.classList.add("active");
+        tab.view.classList.remove("hidden");
+      } else {
+        tab.btn.classList.remove("active");
+        tab.view.classList.add("hidden");
+      }
+    });
+
+    // Specific actions on tab change
+    if (activeTabId === "tab-dashboard") {
       if (AppState.preferences && AppState.preferences.sidebarCollapsed === false) {
         document.body.classList.remove("sidebar-collapsed");
       }
-    });
-    tabInstructions.addEventListener("click", () => {
-      tabInstructions.classList.add("active");
-      tabDashboard.classList.remove("active");
-      instructionsView.classList.remove("hidden");
-      dashboardView.classList.add("hidden");
+    } else if (activeTabId === "tab-productivity") {
+      toggleSidebar(false);
+      document.body.classList.add("sidebar-collapsed");
+      setTimeout(() => calculateAndRenderStreaks(), 100);
+    } else if (activeTabId === "tab-instructions") {
       renderInstructions();
       toggleSidebar(false);
       document.body.classList.add("sidebar-collapsed");
-    });
+    }
   }
+
+  if (tabDashboard) tabDashboard.addEventListener("click", () => switchTab("tab-dashboard"));
+  if (tabProductivity) tabProductivity.addEventListener("click", () => switchTab("tab-productivity"));
+  if (tabInstructions) tabInstructions.addEventListener("click", () => switchTab("tab-instructions"));
 
   // Profile dropdown toggler
   const profileBtn = document.getElementById("profile-dropdown-btn");
@@ -3079,6 +3097,7 @@ function calculateAndRenderStreaks() {
   }
 
   renderWeeklyChart(tasks);
+  checkAndRenderAchievements(completedTasks, currentStreak);
 }
 
 function renderWeeklyChart(tasks) {
@@ -3191,4 +3210,56 @@ function initPwaInstaller() {
   dismissBtn.addEventListener('click', () => {
     banner.classList.add("hidden");
   });
+}
+
+// --- Achievement Unlocking Logic ---
+function checkAndRenderAchievements(completedTasks, currentStreak) {
+  const badgeFirstStep = document.getElementById("badge-first-step");
+  const badgeStreak3 = document.getElementById("badge-streak-3");
+  const badgeStreak7 = document.getElementById("badge-streak-7");
+  const badgeEarlyBird = document.getElementById("badge-early-bird");
+
+  // First Step Badge
+  if (badgeFirstStep) {
+    if (completedTasks.length > 0) {
+      badgeFirstStep.classList.remove("locked");
+      badgeFirstStep.classList.add("unlocked");
+    } else {
+      badgeFirstStep.classList.add("locked");
+      badgeFirstStep.classList.remove("unlocked");
+    }
+  }
+
+  // Streaks Badges
+  if (badgeStreak3) {
+    if (currentStreak >= 3) {
+      badgeStreak3.classList.remove("locked");
+      badgeStreak3.classList.add("unlocked");
+    } else {
+      badgeStreak3.classList.add("locked");
+      badgeStreak3.classList.remove("unlocked");
+    }
+  }
+
+  if (badgeStreak7) {
+    if (currentStreak >= 7) {
+      badgeStreak7.classList.remove("locked");
+      badgeStreak7.classList.add("unlocked");
+    } else {
+      badgeStreak7.classList.add("locked");
+      badgeStreak7.classList.remove("unlocked");
+    }
+  }
+
+  // Early Bird Badge (complete any task scheduled before 09:00)
+  if (badgeEarlyBird) {
+    const hasEarlyTask = completedTasks.some(t => t.time && t.time < "09:00");
+    if (hasEarlyTask) {
+      badgeEarlyBird.classList.remove("locked");
+      badgeEarlyBird.classList.add("unlocked");
+    } else {
+      badgeEarlyBird.classList.add("locked");
+      badgeEarlyBird.classList.remove("unlocked");
+    }
+  }
 }

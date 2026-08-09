@@ -222,6 +222,7 @@
       <!-- View Tab Navigation -->
       <nav class="view-tabs">
         <button class="tab-btn active" id="tab-dashboard">Dashboard</button>
+        <button class="tab-btn" id="tab-productivity">Productivity Stats</button>
         <button class="tab-btn" id="tab-instructions">Important Instructions</button>
       </nav>
 
@@ -395,9 +396,89 @@
             </div>
           </div>
         </div>
-      </section>
-
       </div> <!-- end of dashboard-view -->
+
+      <!-- Productivity Stats View -->
+      <div id="productivity-view" class="hidden">
+        <!-- Analytics Section -->
+        <section class="analytics-section glass-card">
+          <div class="analytics-header">
+            <h2 style="font-size: 1.5rem; font-weight: 700; color: #fff; margin: 0;">📊 Productivity & Streaks</h2>
+            <div class="streak-badge" id="streak-badge-container">
+              <span class="fire-icon">🔥</span>
+              <span id="streak-count-text">0 Day Streak</span>
+            </div>
+          </div>
+          <div class="analytics-body">
+            <!-- Left Panel: Chart -->
+            <div class="chart-container">
+              <span class="chart-subtitle" style="font-size: 0.85rem;">Weekly Task Completion (Last 7 Days)</span>
+              <div class="chart-wrapper" style="height: 220px; margin-top: 12px; padding: 20px;">
+                <svg id="weekly-activity-chart" width="100%" height="200"></svg>
+              </div>
+            </div>
+            <!-- Right Panel: Streak Metrics -->
+            <div class="streak-details" style="flex-direction: column; padding: 24px; min-height: 220px; justify-content: flex-start; align-items: stretch; gap: 20px;">
+              <div class="progress-ring-container" style="display: flex; align-items: center; gap: 20px;">
+                <div class="progress-ring-box">
+                  <svg class="progress-ring" width="80" height="80">
+                    <circle class="progress-ring-circle-bg" stroke="rgba(255,255,255,0.05)" stroke-width="6" fill="transparent" r="32" cx="40" cy="40"/>
+                    <circle id="today-progress-ring" class="progress-ring-circle" stroke="var(--accent-cyan)" stroke-width="6" fill="transparent" r="32" cx="40" cy="40"/>
+                  </svg>
+                  <div class="progress-ring-text">
+                    <span id="today-progress-percent">0%</span>
+                    <small>Today</small>
+                  </div>
+                </div>
+                <div>
+                  <h4 style="color: #fff; font-size: 1rem; margin: 0;">Today's Progress</h4>
+                  <p style="color: #94a3b8; font-size: 0.78rem; margin-top: 4px;">Target is 4 completed tasks daily</p>
+                </div>
+              </div>
+              <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.06); margin: 0;">
+              <div class="streak-records" style="gap: 16px;">
+                <div class="record-item">
+                  <span class="record-label" style="font-size: 0.75rem;">Completed Today</span>
+                  <span class="record-value" id="today-completed-count" style="font-size: 1.2rem;">0 / 4</span>
+                </div>
+                <div class="record-item">
+                  <span class="record-label" style="font-size: 0.75rem;">Personal Best Streak</span>
+                  <span class="record-value" id="longest-streak-count" style="font-size: 1.2rem;">0 Days</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Achievement Badges Showcase -->
+        <section class="achievements-section glass-card" style="margin-top: 24px;">
+          <div class="analytics-header">
+            <h3>🏆 Achievements & Milestones</h3>
+          </div>
+          <div class="achievements-grid">
+            <div class="achievement-card locked" id="badge-first-step">
+              <div class="badge-icon">👣</div>
+              <h4>First Step</h4>
+              <p>Complete your first task</p>
+            </div>
+            <div class="achievement-card locked" id="badge-streak-3">
+              <div class="badge-icon">🥉</div>
+              <h4>Consistent</h4>
+              <p>Achieve a 3-day streak</p>
+            </div>
+            <div class="achievement-card locked" id="badge-streak-7">
+              <div class="badge-icon">🥈</div>
+              <h4>Unstoppable</h4>
+              <p>Achieve a 7-day streak</p>
+            </div>
+            <div class="achievement-card locked" id="badge-early-bird">
+              <div class="badge-icon">🌅</div>
+              <h4>Early Bird</h4>
+              <p>Complete a task before 9:00 AM</p>
+            </div>
+          </div>
+        </section>
+      </div>
 
       <!-- Important Instructions View -->
       <div id="instructions-view" class="hidden">
