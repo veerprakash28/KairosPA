@@ -326,9 +326,6 @@ function initFirebaseAuth() {
         // Hide login overlay
         authOverlay.classList.add("hidden");
 
-        // Save user profile details to Firestore
-        saveUserProfile(user);
-
         // Start Firestore real-time sync
         migrateDeletedField(user.uid);
         syncTasksFromFirestore(user.uid);
@@ -346,10 +343,9 @@ function initFirebaseAuth() {
         if (settingsDivider) settingsDivider.classList.remove("hidden");
 
         if (isManualLogin) {
+          saveUserProfile(user);
           addSessionMessage(`🔒 Synced! Welcome back, **${displayName}**.`);
           isManualLogin = false;
-        } else {
-          logUserActivity("session_restore", { userAgent: navigator.userAgent });
         }
       } else {
         currentUser = null;
