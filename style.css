@@ -1916,11 +1916,6 @@ body.sidebar-collapsed .desktop-sidebar-toggle-btn {
     font-size: 0.8rem;
   }
 
-  .header-status-panel {
-    width: 100%;
-    justify-content: flex-start;
-    gap: 12px;
-  }
 
   .live-clock {
     text-align: left;
