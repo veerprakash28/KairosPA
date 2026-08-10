@@ -492,7 +492,7 @@ body.sidebar-collapsed .desktop-sidebar-toggle-btn {
   display: none;
   position: fixed;
   bottom: 24px;
-  right: 24px;
+  left: 24px;
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -1891,8 +1891,18 @@ body.sidebar-collapsed .desktop-sidebar-toggle-btn {
   .dashboard-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+    gap: 12px;
     margin-bottom: 24px;
+  }
+
+  .header-status-panel {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   .header-left {
@@ -1908,8 +1918,8 @@ body.sidebar-collapsed .desktop-sidebar-toggle-btn {
 
   .header-status-panel {
     width: 100%;
-    justify-content: space-between;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: 12px;
   }
 
   .live-clock {
@@ -2045,8 +2055,9 @@ body.sidebar-collapsed .desktop-sidebar-toggle-btn {
   }
 
   .header-status-panel {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .profile-dropdown {
